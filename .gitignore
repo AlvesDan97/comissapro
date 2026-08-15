@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+Backend/node_modules/
+
+# Local data & env
+Backend/data/
+Backend/.env
+.env
+.env.*
+!.env.example
+!Backend/.env.example
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
+npm-debug.log*
+
+# Backups / old prototypes
+Frontend/comissapro-dark.backup.html
+
+# Build
+dist/
+coverage/

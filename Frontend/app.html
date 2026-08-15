@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#08090A">
+<title>ComissaPro — Central universal de vendas e comissões</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div class="bg-scene">
+  <div class="swirl"></div>
+  <div class="swirl-inner"></div>
+  <div class="glow glow1"></div>
+  <div class="glow glow2"></div>
+  <div class="grain"></div>
+</div>
+
+<!-- SPLASH -->
+<div id="splash">
+  <div class="splash-mark"><span class="sq">C</span>comissapro</div>
+  <div class="splash-tag">sua central universal de vendas e comissões</div>
+  <div class="splash-ladder"><span></span><span></span><span></span><span></span><span></span></div>
+  <button class="btn-ghost" id="btnStart">Começar</button>
+</div>
+
+<!-- LOGIN / REGISTER -->
+<div id="login">
+  <div class="login-card">
+    <div class="login-brand"><div class="sq">C</div><div class="name">comissapro</div></div>
+    <div class="login-title" id="authTitle">Bem-vindo de volta</div>
+    <p class="login-sub" id="authSub">Acesse sua central de comissões.</p>
+    <div id="authError" class="error-box hidden"></div>
+    <div class="social-row">
+      <button class="btn-secondary" type="button" id="btnGoogle" style="margin:0">Google</button>
+      <button class="btn-secondary" type="button" id="btnApple" style="margin:0">Apple</button>
+    </div>
+    <div class="field" id="nameField" style="display:none"><label>Nome</label><input id="authName" type="text" placeholder="Seu nome"></div>
+    <div class="field"><label>E-mail</label><input id="authEmail" type="email" value="marina.souza@exemplo.com"></div>
+    <div class="field"><label>Senha</label><input id="authPassword" type="password" value="demo1234"></div>
+    <div class="field hidden" id="otpField"><label>Código 2FA (OTP)</label><input id="authOtp" type="text" placeholder="123456"></div>
+    <div class="biometry-row"><span>Entrar com biometria</span><button class="switch on" id="bioSwitch" type="button" aria-label="Biometria"></button></div>
+    <label id="termsAcceptRow" class="biometry-row" style="margin:0 0 14px;align-items:flex-start;gap:10px;display:none">
+      <input type="checkbox" id="termsAccept" style="margin-top:3px;accent-color:var(--mint)">
+      <span style="line-height:1.4">Li e aceito os <a href="/termos.html" target="_blank" style="color:var(--mint)">Termos de Uso</a> e a <a href="/privacidade.html" target="_blank" style="color:var(--mint)">Política de Privacidade</a>.</span>
+    </label>
+    <button class="btn-primary" id="btnAuth">Entrar</button>
+    <p class="login-alt" id="authToggleWrap">Novo por aqui? <a id="authToggle">Criar conta</a></p>
+    <p class="login-alt" style="margin-top:8px;font-size:11px">Demo: marina.souza@exemplo.com / demo1234</p>
+    <p class="login-alt" style="margin-top:10px;font-size:11px">
+      <a href="/termos.html" target="_blank" style="color:var(--text-dim)">Termos</a> ·
+      <a href="/privacidade.html" target="_blank" style="color:var(--text-dim)">Privacidade</a> ·
+      <a href="/cancelamento.html" target="_blank" style="color:var(--text-dim)">Cancelamento</a>
+    </p>
+  </div>
+</div>
+
+<!-- ONBOARDING -->
+<div id="onboarding">
+  <div class="wizard-card" id="wizardNiche">
+    <div class="login-brand"><div class="sq">C</div><div class="name">comissapro</div></div>
+    <div class="login-title">Qual é o seu principal mercado?</div>
+    <p class="login-sub">Personalizamos formulários e regras para o seu nicho.</p>
+    <div class="niche-grid" id="nicheGrid"></div>
+    <button class="btn-primary" id="btnNicheNext" disabled>Continuar</button>
+  </div>
+  <div class="wizard-card hidden" id="wizardMulti">
+    <div class="login-title">Você vende em quantas empresas?</div>
+    <p class="login-sub">O ComissaPro atende quem tem uma loja ou várias.</p>
+    <div class="choice-row">
+      <button type="button" data-multi="0" class="on">Uma empresa</button>
+      <button type="button" data-multi="1">Várias empresas</button>
+    </div>
+    <button class="btn-primary" id="btnMultiNext">Continuar</button>
+  </div>
+  <div class="wizard-card hidden" id="wizardStore">
+    <div class="login-title">Cadastre sua primeira loja</div>
+    <p class="login-sub">Qual é a primeira loja ou empresa que você atende?</p>
+    <div class="field"><label>Nome</label><input id="firstStoreName" placeholder="Ex: Concessionária Ford Sul"></div>
+    <div class="field"><label>CNPJ (opcional)</label><input id="firstStoreCnpj" placeholder="00.000.000/0000-00"></div>
+    <div class="field"><label>Cor de identificação</label><input id="firstStoreColor" type="color" value="#3FDA9A"></div>
+    <div class="field"><label>Modelo de comissão</label>
+      <select id="firstStoreRule">
+        <option value="bands">Faixas progressivas por meta</option>
+        <option value="fixed">Percentual fixo</option>
+        <option value="margin">Margem de lucro</option>
+        <option value="product_table">Tabela por produto</option>
+        <option value="cash_on_receipt">No recebimento (caixa)</option>
+        <option value="milestones">Marcos (sinal/escritura)</option>
+      </select>
+    </div>
+    <div class="field"><label>Prazo padrão de pagamento (dias)</label><input id="firstStoreDays" type="number" value="30"></div>
+    <button class="btn-primary" id="btnFinishOnboarding">Entrar no painel</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="sidebar-brand"><div class="sq">C</div><div class="name">comissapro</div></div>
+      <div class="nav-group-label">Visão geral</div>
+      <button class="nav-item active" data-screen="dashboard"><span class="ico">▣</span>Painel</button>
+      <button class="nav-item" data-screen="lojas"><span class="ico">⌂</span>Lojas</button>
+      <button class="nav-item" data-screen="vendas"><span class="ico">☰</span>Vendas</button>
+      <button class="nav-item" data-screen="pipeline"><span class="ico">◎</span>Pipeline</button>
+      <button class="nav-item" data-screen="recebiveis"><span class="ico">₿</span>Recebíveis</button>
+      <div class="nav-group-label">Recursos</div>
+      <button class="nav-item" data-screen="simulador"><span class="ico">↕</span>Simulador</button>
+      <button class="nav-item" data-screen="reconciliacao"><span class="ico">✓</span>Conciliação</button>
+      <button class="nav-item" data-screen="alisamento"><span class="ico">≈</span>Alisamento</button>
+      <div class="nav-group-label">Conta</div>
+      <button class="nav-item" data-screen="equipe"><span class="ico">☺</span>Equipe</button>
+      <button class="nav-item" data-screen="auditoria"><span class="ico">▤</span>Auditoria</button>
+      <button class="nav-item" data-screen="planos"><span class="ico">◆</span>Planos</button>
+      <button class="nav-item" data-screen="config"><span class="ico">⚙</span>Configurações</button>
+      <a href="/" style="display:block;margin:12px 10px 0;font-size:12px;color:var(--text-faint);text-decoration:none">← Site ComissaPro</a>
+      <div class="sidebar-foot">
+        <div class="avatar" id="sideAvatar">MS</div>
+        <div><div class="who" id="sideName">—</div><div class="role" id="sideRole">—</div></div>
+      </div>
+      <div class="theme-toggle">
+        <button type="button" data-theme="light">Claro</button>
+        <button type="button" data-theme="dark" class="on">Escuro</button>
+      </div>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <div class="topbar-title" id="pageTitle">Painel</div>
+        <div class="search-pill">
+          <input id="globalSearch" placeholder="Buscar venda, loja, cliente...">
+        </div>
+        <div class="topbar-right">
+          <span class="offline-pill" id="offlinePill">Offline</span>
+          <div class="store-select">
+            <select id="storeFilter"><option value="">Todas as lojas</option></select>
+          </div>
+          <button class="icon-btn" id="btnExport" title="Exportar CSV">↓</button>
+          <div class="user-pill"><div class="avatar" id="topAvatar" style="width:26px;height:26px;font-size:10px">MS</div><span class="who" id="topName">—</span></div>
+        </div>
+      </div>
+
+      <!-- DASHBOARD -->
+      <section class="screen active" id="screen-dashboard">
+        <div class="dash-grid">
+          <div>
+            <div class="hero-row">
+              <div>
+                <div class="hero-label">Comissão do mês</div>
+                <div class="hero-value mono" id="kpiCommission">R$ 0</div>
+                <div class="hero-sub" id="kpiSalesCount">0 vendas neste ciclo</div>
+              </div>
+              <button class="hero-add" id="btnNewSaleHero" type="button">+</button>
+            </div>
+            <div class="kpi-grid">
+              <div class="kpi-card"><div class="lbl">Recebida / quitada</div><div class="val mono" id="kpiReceived">R$ 0</div><div class="sub">Oficial + por fora</div></div>
+              <div class="kpi-card"><div class="lbl">Pipeline a receber</div><div class="val mono" id="kpiPipeline">R$ 0</div><div class="sub">Previsto / parcial / atraso</div></div>
+              <div class="kpi-card"><div class="lbl">Faturamento vendas</div><div class="val mono" id="kpiRevenue">R$ 0</div><div class="sub">Período atual</div></div>
+            </div>
+            <div class="section-title">Por loja</div>
+            <div class="mini-grid" id="byStoreCards"></div>
+            <div class="section-title">Evolução</div>
+            <div class="analytics-card">
+              <div class="an-head">
+                <div class="an-toggle">
+                  <button class="on" id="tglComissao" type="button">Comissão</button>
+                  <button id="tglFaturamento" type="button">Faturamento</button>
+                </div>
+              </div>
+              <svg viewBox="0 0 600 160" width="100%" height="160" id="mainChart" preserveAspectRatio="none"></svg>
+              <div class="chart-axis" id="chartAxis"></div>
+            </div>
+            <div class="section-title">Faixa de comissão</div>
+            <div class="ladder-card" id="ladderCard">
+              <div class="ladder-head">
+                <div><h4 id="ladderStore">—</h4><p id="ladderUnits">—</p></div>
+                <div class="ladder-badge" id="ladderBadge">—</div>
+              </div>
+              <div class="ladder-steps" id="ladderSteps"></div>
+              <div class="ladder-labels" id="ladderLabels"></div>
+              <div class="ladder-note" id="ladderNote"></div>
+            </div>
+          </div>
+          <div>
+            <div class="op-card">
+              <div class="op-tabs">
+                <button class="on" type="button">Atalhos</button>
+              </div>
+              <button class="btn-primary" id="btnNewSaleSide">Registrar nova venda</button>
+              <button class="btn-secondary" data-go="reconciliacao">Conciliação de extratos</button>
+              <button class="btn-secondary" data-go="pipeline">Ver pipeline</button>
+              <button class="btn-secondary" data-go="alisamento">Alisamento de renda</button>
+            </div>
+            <div class="section-title">Últimas vendas</div>
+            <div class="op-card" id="recentSales" style="padding:8px 16px"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- LOJAS -->
+      <section class="screen" id="screen-lojas">
+        <div class="section-title" style="margin-top:0">Parceiros ativos <button class="link" id="btnAddStore">+ Nova loja</button></div>
+        <div class="stores-grid" id="storesList"></div>
+        <div class="section-title">Editor de regras</div>
+        <div class="op-card" id="ruleEditor">
+          <p class="empty">Selecione uma loja para editar as regras.</p>
+        </div>
+      </section>
+
+      <!-- VENDAS -->
+      <section class="screen" id="screen-vendas">
+        <div class="filter-row" id="saleFilters">
+          <button class="chip active" data-status="todas">Todas</button>
+          <button class="chip" data-status="pendente">Pendente</button>
+          <button class="chip" data-status="quitada">Quitada</button>
+          <button class="chip" data-status="cancelada">Cancelada</button>
+        </div>
+        <div class="form-grid" style="margin-bottom:14px">
+          <div class="form-field"><label>De</label><input type="date" id="saleFrom"></div>
+          <div class="form-field"><label>Até</label><input type="date" id="saleTo"></div>
+          <div class="form-field"><label>Busca</label><input type="text" id="saleQuery" placeholder="Cliente ou veículo"></div>
+        </div>
+        <div id="salesList"></div>
+      </section>
+
+      <!-- PIPELINE -->
+      <section class="screen" id="screen-pipeline">
+        <div class="section-title" style="margin-top:0">Pipeline comercial <button class="link" id="btnAddLead">+ Lead</button></div>
+        <div id="leadsList"></div>
+      </section>
+
+      <!-- RECEBÍVEIS -->
+      <section class="screen" id="screen-recebiveis">
+        <div class="section-title" style="margin-top:0">Calendário de recebíveis</div>
+        <div id="receivablesList"></div>
+      </section>
+
+      <!-- SIMULADOR -->
+      <section class="screen" id="screen-simulador">
+        <div class="section-title" style="margin-top:0">Simulador "E se…"</div>
+        <div class="sim-grid">
+          <div class="sim-card">
+            <h4 style="margin:0 0 4px;font-size:14px">Ajuste os cenários</h4>
+            <p style="font-size:11.5px;color:var(--text-faint);margin:0 0 16px">Impacto imediato na faixa de comissão.</p>
+            <div class="form-field" style="margin-bottom:14px"><label>Loja</label><select id="simStore"></select></div>
+            <div class="slider-row"><div class="slider-head"><span>Vendas adicionais</span><span class="val" id="simUnitsVal">3 un.</span></div><input type="range" min="0" max="15" value="3" id="simUnits"></div>
+            <div class="slider-row"><div class="slider-head"><span>Ticket médio</span><span class="val" id="simTicketVal">R$ 68.000</span></div><input type="range" min="20000" max="300000" step="1000" value="68000" id="simTicket"></div>
+          </div>
+          <div class="sim-result">
+            <div class="lbl">Comissão projetada</div>
+            <div class="num" id="simResult">R$ 0</div>
+            <div class="diff" id="simDiff">—</div>
+          </div>
+        </div>
+        <div class="section-title">Projeção da escada</div>
+        <div class="ladder-card">
+          <div class="ladder-head"><div><h4 id="simProjLabel">—</h4><p>Projeção</p></div><div class="ladder-badge" id="simBadge">—</div></div>
+          <div class="ladder-steps" id="ladderStepsSim"></div>
+          <div class="ladder-labels" id="ladderLabelsSim"></div>
+        </div>
+      </section>
+
+      <!-- CONCILIAÇÃO -->
+      <section class="screen" id="screen-reconciliacao">
+        <div class="section-title" style="margin-top:0">Smart Reconciliation</div>
+        <div class="upload-zone">
+          <div style="font-size:28px;margin-bottom:10px;color:var(--mint)">↑</div>
+          <div style="font-weight:700;margin-bottom:4px">Envie o relatório da empresa</div>
+          <div style="font-size:12px;color:var(--text-faint);margin-bottom:16px">PDF ou Excel — cruzamos com suas vendas</div>
+          <input type="file" id="reconFile" accept=".pdf,.xls,.xlsx,.csv" hidden>
+          <button class="upload-btn" id="btnRecon" type="button">Selecionar arquivo</button>
+        </div>
+        <div id="reconResults"></div>
+      </section>
+
+      <!-- ALISAMENTO -->
+      <section class="screen" id="screen-alisamento">
+        <div class="section-title" style="margin-top:0">Alisamento de renda</div>
+        <div class="kpi-grid" id="smoothKpis"></div>
+        <div class="op-card" style="margin-top:16px">
+          <p id="smoothSuggestion" style="margin:0;font-size:14px;line-height:1.5;color:var(--text-dim)"></p>
+        </div>
+        <div class="section-title">Histórico 12 meses</div>
+        <div class="analytics-card">
+          <svg viewBox="0 0 600 160" width="100%" height="160" id="smoothChart" preserveAspectRatio="none"></svg>
+          <div class="chart-axis" id="smoothAxis"></div>
+        </div>
+      </section>
+
+      <!-- EQUIPE -->
+      <section class="screen" id="screen-equipe">
+        <div class="section-title" style="margin-top:0">Equipe & split <button class="link" id="btnInvite">+ Convidar</button></div>
+        <div id="teamList"></div>
+      </section>
+
+      <!-- AUDITORIA -->
+      <section class="screen" id="screen-auditoria">
+        <div class="section-title" style="margin-top:0">Trilha de auditoria</div>
+        <div class="op-card" id="auditList"></div>
+      </section>
+
+      <!-- PLANOS -->
+      <section class="screen" id="screen-planos">
+        <div class="section-title" style="margin-top:0">Seu plano</div>
+        <div class="settings-card" id="currentPlanCard" style="margin-bottom:16px"></div>
+        <div class="section-title">Trocar plano
+          <div class="an-toggle" id="planCycleToggle" style="margin:0">
+            <button type="button" class="on" data-cycle="monthly">Mensal</button>
+            <button type="button" data-cycle="yearly">Anual</button>
+          </div>
+        </div>
+        <div class="stores-grid" id="plansAppGrid"></div>
+      </section>
+
+      <!-- CONFIG -->
+      <section class="screen" id="screen-config">
+        <div class="section-title" style="margin-top:0">Configurações & segurança</div>
+        <div class="settings-card">
+          <div class="toggle-field" style="margin:0 0 10px"><span>Autenticação 2FA (OTP)</span><button class="switch" id="cfg2fa" type="button"></button></div>
+          <div class="toggle-field" style="margin:0 0 10px"><span>Biometria nativa</span><button class="switch" id="cfgBio" type="button"></button></div>
+          <div class="kv"><span>Plano atual</span><span id="cfgPlan">—</span></div>
+          <div class="kv"><span>Nicho</span><span id="cfgNiche">—</span></div>
+          <div class="kv"><span>Multi-lojas</span><span id="cfgMulti">—</span></div>
+          <div class="kv" style="border:none"><span>Criptografia</span><span>TLS 1.3 + AES-256 (em repouso no servidor)</span></div>
+          <button class="btn-secondary" data-go="planos">Gerenciar plano</button>
+          <a class="btn-secondary" href="/termos.html" target="_blank" style="display:block;text-align:center;text-decoration:none;line-height:1.2;padding-top:14px">Termos de Uso</a>
+          <a class="btn-secondary" href="/privacidade.html" target="_blank" style="display:block;text-align:center;text-decoration:none;line-height:1.2;padding-top:14px">Política de Privacidade</a>
+          <a class="btn-secondary" href="/cookies.html" target="_blank" style="display:block;text-align:center;text-decoration:none;line-height:1.2;padding-top:14px">Política de Cookies</a>
+          <a class="btn-secondary" href="/cancelamento.html" target="_blank" style="display:block;text-align:center;text-decoration:none;line-height:1.2;padding-top:14px">Cancelamento e Reembolso</a>
+          <button class="btn-secondary" id="btnLogout">Sair da conta</button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <button class="fab" id="fabNewSale" type="button">+</button>
+  <nav class="bottom-nav" id="bottomNav">
+    <button class="bn-item active" data-screen="dashboard">Painel</button>
+    <button class="bn-item" data-screen="lojas">Lojas</button>
+    <button class="bn-item" data-screen="vendas">Vendas</button>
+    <button class="bn-item" data-screen="pipeline">Pipeline</button>
+    <button class="bn-item" data-screen="simulador">Simular</button>
+    <button class="bn-item" data-screen="reconciliacao">Conciliar</button>
+    <button class="bn-item" data-screen="planos">Planos</button>
+    <button class="bn-item" data-screen="config">Conta</button>
+  </nav>
+</div>
+
+<!-- MODAL VENDA -->
+<div class="overlay" id="saleOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h3>Nova venda</h3><button class="sheet-close" type="button" data-close="saleOverlay">✕</button></div>
+    <div class="form-grid" id="saleForm"></div>
+    <button class="btn-primary" style="margin-top:20px" id="btnSaveSale">Registrar venda</button>
+  </div>
+</div>
+
+<!-- MODAL DETALHE -->
+<div class="overlay" id="detailOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h3 id="detailTitle">—</h3><button class="sheet-close" type="button" data-close="detailOverlay">✕</button></div>
+    <div class="snap-banner" id="detailSnap"></div>
+    <div id="detailBody"></div>
+    <div class="form-grid" style="margin-top:14px">
+      <div class="form-field full"><label>Status</label>
+        <select id="detailStatus"><option value="pendente">Pendente</option><option value="quitada">Quitada</option><option value="cancelada">Cancelada</option></select>
+      </div>
+    </div>
+    <button class="btn-primary" style="margin-top:12px" id="btnUpdateSale">Salvar status</button>
+  </div>
+</div>
+
+<!-- MODAL LOJA -->
+<div class="overlay" id="storeOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h3>Nova loja / fornecedor</h3><button class="sheet-close" type="button" data-close="storeOverlay">✕</button></div>
+    <div class="form-grid" id="storeForm"></div>
+    <button class="btn-primary" style="margin-top:20px" id="btnSaveStore">Salvar loja</button>
+  </div>
+</div>
+
+<!-- MODAL LEAD -->
+<div class="overlay" id="leadOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h3>Novo lead</h3><button class="sheet-close" type="button" data-close="leadOverlay">✕</button></div>
+    <div class="form-grid" id="leadForm"></div>
+    <button class="btn-primary" style="margin-top:20px" id="btnSaveLead">Salvar lead</button>
+  </div>
+</div>
+
+<!-- MODAL CONVITE -->
+<div class="overlay" id="inviteOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h3>Convidar parceiro</h3><button class="sheet-close" type="button" data-close="inviteOverlay">✕</button></div>
+    <div class="field"><label>E-mail</label><input id="inviteEmail" type="email"></div>
+    <div class="field"><label>Nome</label><input id="inviteName"></div>
+    <div class="field"><label>Papel</label>
+      <select id="inviteRole">
+        <option value="viewer">Somente ver</option>
+        <option value="editor">Lançar vendas</option>
+        <option value="admin">Editar regras</option>
+      </select>
+    </div>
+    <button class="btn-primary" id="btnSaveInvite">Enviar convite</button>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

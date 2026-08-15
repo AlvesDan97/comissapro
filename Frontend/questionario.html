@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Questionário ComissaPro — Descoberta</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,600;9..40,700;9..40,800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#070809;--text:#F2F4F0;--dim:#9AA19A;--mint:#3FDA9A;--line:rgba(255,255,255,.1);--card:rgba(255,255,255,.04)}
+*{box-sizing:border-box}body{margin:0;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
+a{color:var(--mint)}.wrap{max-width:720px;margin:0 auto;padding:20px 16px 80px}
+.brand{display:flex;align-items:center;gap:8px;font-weight:800;margin-bottom:18px;text-decoration:none;color:var(--text)}
+.sq{width:26px;height:26px;border-radius:7px;background:var(--mint);color:#06110C;display:grid;place-items:center;font-size:13px}
+h1{font-size:1.7rem;letter-spacing:-.03em;margin:0 0 8px}
+.lead{color:var(--dim);margin:0 0 22px;line-height:1.5}
+.block{border:1px solid var(--line);background:var(--card);border-radius:14px;padding:16px;margin-bottom:14px}
+.block h2{margin:0 0 6px;font-size:1.05rem}.block .hint{margin:0 0 14px;font-size:12.5px;color:var(--dim)}
+.q{margin-bottom:16px}.q:last-child{margin-bottom:0}
+.q label.title{display:block;font-weight:700;font-size:14px;margin-bottom:8px}
+.opts{display:grid;gap:6px}
+.opts label{display:flex;gap:8px;align-items:flex-start;font-size:13.5px;color:var(--dim);line-height:1.35;cursor:pointer}
+.opts input{margin-top:3px;accent-color:var(--mint)}
+textarea,input[type=text],input[type=email],input[type=tel]{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--text);font:inherit}
+textarea{min-height:72px;resize:vertical}
+.row{display:grid;gap:10px}@media(min-width:640px){.row.two{grid-template-columns:1fr 1fr}}
+.actions{position:sticky;bottom:0;padding:12px 0 0;background:linear-gradient(transparent,var(--bg) 30%);display:flex;gap:10px;flex-wrap:wrap}
+button{border:none;border-radius:9px;padding:12px 16px;font-weight:700;cursor:pointer;font-family:inherit}
+.btn{background:var(--mint);color:#06170F}.btn.ghost{background:transparent;color:var(--text);border:1px solid var(--line)}
+.ok{display:none;padding:12px;border-radius:10px;background:rgba(63,218,154,.14);color:var(--mint);font-size:14px;margin-bottom:14px}
+.mono{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--dim)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="brand" href="/"><span class="sq">C</span>comissapro</a>
+  <h1>Questionário de descoberta</h1>
+  <p class="lead">Ajude a gente a entender como você trabalha com vendas e comissões. Leva cerca de 10 minutos. Não tem resposta certa — queremos o seu dia a dia real.</p>
+  <div class="ok" id="okMsg">Obrigado! Suas respostas foram salvas neste navegador. Se pedirmos, é só encaminhar o arquivo baixado.</div>
+
+  <form id="qForm">
+    <section class="block">
+      <h2>0. Perfil</h2>
+      <p class="hint">Para entender quem está respondendo</p>
+      <div class="q"><label class="title">1. Qual é o seu papel hoje?</label>
+        <div class="opts">
+          <label><input type="radio" name="papel" value="vendedor_loja" required> Vendedor(a) de loja / concessionária</label>
+          <label><input type="radio" name="papel" value="corretor_imob"> Corretor(a) imobiliário</label>
+          <label><input type="radio" name="papel" value="representante"> Representante comercial / multimarcas</label>
+          <label><input type="radio" name="papel" value="seguros"> Corretor(a) de seguros</label>
+          <label><input type="radio" name="papel" value="autonomo"> Autônomo / consultor</label>
+          <label><input type="radio" name="papel" value="gerente"> Gerente / líder de time</label>
+          <label><input type="radio" name="papel" value="outro"> Outro</label>
+        </div>
+      </div>
+      <div class="q"><label class="title">2. Em quantas empresas/lojas você vende?</label>
+        <div class="opts">
+          <label><input type="radio" name="qtd_lojas" value="1" required> 1</label>
+          <label><input type="radio" name="qtd_lojas" value="2-3"> 2–3</label>
+          <label><input type="radio" name="qtd_lojas" value="4-6"> 4–6</label>
+          <label><input type="radio" name="qtd_lojas" value="7+"> 7 ou mais</label>
+        </div>
+      </div>
+      <div class="q"><label class="title">3. Comissão média mensal aproximada?</label>
+        <div class="opts">
+          <label><input type="radio" name="renda" value="ate_3k"> Até R$ 3.000</label>
+          <label><input type="radio" name="renda" value="3_8k"> R$ 3.001 – R$ 8.000</label>
+          <label><input type="radio" name="renda" value="8_15k"> R$ 8.001 – R$ 15.000</label>
+          <label><input type="radio" name="renda" value="15k+"> Acima de R$ 15.000</label>
+          <label><input type="radio" name="renda" value="na"> Prefiro não informar</label>
+        </div>
+      </div>
+      <div class="q"><label class="title">4. Como controla comissões hoje? (vários ok)</label>
+        <div class="opts">
+          <label><input type="checkbox" name="controle" value="papel"> Caderno / papel</label>
+          <label><input type="checkbox" name="controle" value="whatsapp"> WhatsApp / prints</label>
+          <label><input type="checkbox" name="controle" value="planilha"> Planilha</label>
+          <label><input type="checkbox" name="controle" value="sistema_empresa"> Sistema da empresa</label>
+          <label><input type="checkbox" name="controle" value="app_financas"> App de finanças</label>
+          <label><input type="checkbox" name="controle" value="nao_organiza"> Não controlo de forma organizada</label>
+        </div>
+      </div>
+    </section>
+
+    <section class="block">
+      <h2>1. Dor principal</h2>
+      <p class="hint">Escolha até 2 na pergunta 5</p>
+      <div class="q"><label class="title">5. Maior dor hoje (até 2)</label>
+        <div class="opts" id="dores">
+          <label><input type="checkbox" name="dor" value="nao_sei_receber"> Não sei quanto vou receber no mês</label>
+          <label><input type="checkbox" name="dor" value="regras_diferentes"> Cada loja tem regra diferente</label>
+          <label><input type="checkbox" name="dor" value="extrato_nao_bate"> Extrato não bate com o que anotei</label>
+          <label><input type="checkbox" name="dor" value="por_fora"> Comissão “por fora” bagunçada</label>
+          <label><input type="checkbox" name="dor" value="faixa_meta"> Não sei se vale empurrar mais uma venda pela faixa</label>
+          <label><input type="checkbox" name="dor" value="split"> Split com parceiro gera conflito</label>
+          <label><input type="checkbox" name="dor" value="imposto_reserva"> Imposto / quanto posso gastar</label>
+        </div>
+      </div>
+      <div class="q"><label class="title">6. O que mais te faz perder dinheiro ou tempo?</label><textarea name="dor_aberta" placeholder="Conte com suas palavras"></textarea></div>
+      <div class="q"><label class="title">7. Frequência de divergência de pagamento</label>
+        <div class="opts">
+          <label><input type="radio" name="divergencia" value="quase_nunca"> Quase nunca</label>
+          <label><input type="radio" name="divergencia" value="1x_mes"> 1x por mês</label>
+          <label><input type="radio" name="divergencia" value="semana"> Toda semana / quase</label>
+          <label><input type="radio" name="divergencia" value="todo_fechamento"> Em quase todo fechamento</label>
+        </div>
+      </div>
+    </section>
+
+    <section class="block">
+      <h2>2. Regras de comissão</h2>
+      <div class="q"><label class="title">8. Quais modelos você usa? (vários ok)</label>
+        <div class="opts">
+          <label><input type="checkbox" name="modelo" value="fixo"> Percentual fixo</label>
+          <label><input type="checkbox" name="modelo" value="faixas"> Faixas por volume</label>
+          <label><input type="checkbox" name="modelo" value="margem"> Margem / lucro</label>
+          <label><input type="checkbox" name="modelo" value="tabela"> Por produto / tabela</label>
+          <label><input type="checkbox" name="modelo" value="caixa"> Só no recebimento (caixa)</label>
+          <label><input type="checkbox" name="modelo" value="marcos"> Por etapas / marcos</label>
+          <label><input type="checkbox" name="modelo" value="bonus"> Premiação / bônus</label>
+          <label><input type="checkbox" name="modelo" value="oficial_porfora"> Oficial + por fora</label>
+          <label><input type="checkbox" name="modelo" value="empresa_calcula"> A empresa que calcula</label>
+        </div>
+      </div>
+      <div class="q"><label class="title">9. Se a tabela muda, vendas antigas devem…</label>
+        <div class="opts">
+          <label><input type="radio" name="snapshot" value="manter"> Manter a regra da data da venda</label>
+          <label><input type="radio" name="snapshot" value="recalcular"> Recalcular com a regra nova</label>
+          <label><input type="radio" name="snapshot" value="depende"> Depende / às vezes tem reajuste</label>
+          <label><input type="radio" name="snapshot" value="nao_sei"> Não sei</label>
+        </div>
+      </div>
+      <div class="q"><label class="title">10. Campos indispensáveis no formulário de venda</label><textarea name="campos" placeholder="Ex: veículo, protect, blindagem / imóvel, matrícula / pedido, marca..."></textarea></div>
+    </section>
+
+    <section class="block">
+      <h2>3. Fluxo da venda</h2>
+      <div class="q"><label class="title">11. Quando você lançaria no app?</label>
+        <div class="opts">
+          <label><input type="checkbox" name="momento" value="lead"> Quando surge o lead</label>
+          <label><input type="checkbox" name="momento" value="fecha"> Quando fecha</label>
+          <label><input type="checkbox" name="momento" value="contrato"> Quando emite nota/contrato</label>
+          <label><input type="checkbox" name="momento" value="recebe"> Quando recebe a comissão</label>
+        </div>
+      </div>
+      <div class="q"><label class="title">12. Precisa de funil (lead → proposta → fechado)?</label>
+        <div class="opts">
+          <label><input type="radio" name="funil" value="sim"> Sim</label>
+          <label><input type="radio" name="funil" value="nao"> Não, só venda fechada</label>
+        </div>
+      </div>
+      <div class="q"><label class="title">13. Como a comissão é paga?</label>
+        <div class="opts">
+          <label><input type="radio" name="pagamento" value="avista"> À vista / uma vez</label>
+          <label><input type="radio" name="pagamento" value="parcelado"> Parcelado</label>
+          <label><input type="radio" name="pagamento" value="marcos"> Por marcos</label>
+          <label><input type="radio" name="pagamento" value="misto"> Mistura</label>
+        </div>
+      </div>
+      <div class="q"><label class="title">14. Divide venda com outra pessoa?</label>
+        <div class="opts">
+          <label><input type="radio" name="split" value="nunca"> Nunca</label>
+          <label><input type="radio" name="split" value="as_vezes"> Às vezes</label>
+          <label><input type="radio" name="split" value="sempre"> Sempre / quase sempre</label>
+        </div>
+      </div>
+    </section>
+
+    <section class="block">
+      <h2>4. Conferência</h2>
+      <div class="q"><label class="title">15. Cruzar automaticamente com PDF/Excel da empresa seria…</label>
+        <div class="opts">
+          <label><input type="radio" name="conciliacao" value="essencial"> Essencial</label>
+          <label><input type="radio" name="conciliacao" value="muito_util"> Muito útil</label>
+          <label><input type="radio" name="conciliacao" value="depois"> Legal, mas depois</label>
+          <label><input type="radio" name="conciliacao" value="nao"> Não usaria</label>
+        </div>
+      </div>
+      <div class="q"><label class="title">16. Anexa comprovantes (foto/NF/print)?</label>
+        <div class="opts">
+          <label><input type="radio" name="anexo" value="sempre"> Sim, sempre</label>
+          <label><input type="radio" name="anexo" value="as_vezes"> Às vezes</label>
+          <label><input type="radio" name="anexo" value="nao"> Não</label>
+        </div>
+      </div>
+    </section>
+
+    <section class="block">
+      <h2>5. Prioridade e valor</h2>
+      <div class="q"><label class="title">17. O que NÃO pode faltar? (até 3)</label>
+        <div class="opts" id="must">
+          <label><input type="checkbox" name="must" value="multilojas"> Multilojas</label>
+          <label><input type="checkbox" name="must" value="faixas"> Faixas / metas</label>
+          <label><input type="checkbox" name="must" value="snapshot"> Snapshot (não mudar o passado)</label>
+          <label><input type="checkbox" name="must" value="oficial_porfora"> Oficial vs por fora</label>
+          <label><input type="checkbox" name="must" value="pipeline"> Pipeline / leads</label>
+          <label><input type="checkbox" name="must" value="recebiveis"> Recebíveis / parcelas</label>
+          <label><input type="checkbox" name="must" value="conciliacao"> Conciliação de extrato</label>
+          <label><input type="checkbox" name="must" value="simulador"> Simulador de metas</label>
+          <label><input type="checkbox" name="must" value="alisamento"> Alisamento / reserva</label>
+          <label><input type="checkbox" name="must" value="split"> Split com parceiro</label>
+          <label><input type="checkbox" name="must" value="export"> Exportação contador</label>
+          <label><input type="checkbox" name="must" value="offline"> Offline no celular</label>
+        </div>
+      </div>
+      <div class="q"><label class="title">18. Quanto faria sentido pagar por mês?</label>
+        <div class="opts">
+          <label><input type="radio" name="preco" value="29"> Até R$ 29</label>
+          <label><input type="radio" name="preco" value="49"> R$ 30 – R$ 49</label>
+          <label><input type="radio" name="preco" value="89"> R$ 50 – R$ 89</label>
+          <label><input type="radio" name="preco" value="149"> R$ 90 – R$ 149</label>
+          <label><input type="radio" name="preco" value="149+"> Acima de R$ 149</label>
+          <label><input type="radio" name="preco" value="gratis"> Só se for grátis</label>
+        </div>
+      </div>
+      <div class="q"><label class="title">19. Função que sente falta / viu em outro lugar</label><textarea name="wishlist"></textarea></div>
+      <div class="q"><label class="title">20. Dispositivo principal</label>
+        <div class="opts">
+          <label><input type="radio" name="device" value="mobile"> Quase só celular</label>
+          <label><input type="radio" name="device" value="desktop"> Quase só computador</label>
+          <label><input type="radio" name="device" value="ambos"> Os dois</label>
+        </div>
+      </div>
+    </section>
+
+    <section class="block">
+      <h2>6. Contato</h2>
+      <div class="row two">
+        <div class="q"><label class="title">Nome (opcional)</label><input type="text" name="nome"></div>
+        <div class="q"><label class="title">WhatsApp / e-mail</label><input type="text" name="contato" placeholder="para retorno"></div>
+      </div>
+      <div class="q"><label class="title">Topa testar o beta?</label>
+        <div class="opts">
+          <label><input type="radio" name="beta" value="sim"> Sim</label>
+          <label><input type="radio" name="beta" value="talvez"> Talvez</label>
+          <label><input type="radio" name="beta" value="nao"> Não</label>
+        </div>
+      </div>
+      <div class="q"><label class="title">Pode conversar 15 min?</label>
+        <div class="opts">
+          <label><input type="radio" name="entrevista" value="sim"> Sim</label>
+          <label><input type="radio" name="entrevista" value="nao"> Não</label>
+        </div>
+      </div>
+    </section>
+
+    <div class="actions">
+      <button class="btn" type="submit">Enviar respostas</button>
+      <button class="btn ghost" type="button" id="btnCopy">Copiar resumo</button>
+    </div>
+    <p class="mono" style="margin-top:12px">As respostas ficam salvas localmente e geram um arquivo JSON para você encaminhar.</p>
+  </form>
+</div>
+<script>
+function limitChecks(name, max) {
+  document.querySelectorAll(`input[name="${name}"]`).forEach((el) => {
+    el.addEventListener('change', () => {
+      const checked = [...document.querySelectorAll(`input[name="${name}"]:checked`)];
+      if (checked.length > max) el.checked = false;
+    });
+  });
+}
+limitChecks('dor', 2);
+limitChecks('must', 3);
+
+function formToObject(form) {
+  const data = {};
+  const fd = new FormData(form);
+  for (const [k, v] of fd.entries()) {
+    if (data[k] === undefined) data[k] = v;
+    else if (Array.isArray(data[k])) data[k].push(v);
+    else data[k] = [data[k], v];
+  }
+  data._enviadoEm = new Date().toISOString();
+  return data;
+}
+
+document.getElementById('qForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const data = formToObject(e.target);
+  const list = JSON.parse(localStorage.getItem('cp_questionarios') || '[]');
+  list.push(data);
+  localStorage.setItem('cp_questionarios', JSON.stringify(list));
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `comissapro-resposta-${Date.now()}.json`;
+  a.click();
+  document.getElementById('okMsg').style.display = 'block';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+document.getElementById('btnCopy').onclick = () => {
+  const data = formToObject(document.getElementById('qForm'));
+  const text = Object.entries(data).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join('\n');
+  navigator.clipboard.writeText(text).then(() => alert('Resumo copiado! Cole no WhatsApp/e-mail.'));
+};
+</script>
+</body>
+</html>

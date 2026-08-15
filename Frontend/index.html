@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="ComissaPro — central universal de vendas e comissões para quem vende em uma ou várias empresas.">
+<title>comissapro — sua central de vendas e comissões</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/home.css">
+</head>
+<body>
+<div class="bg-scene" aria-hidden="true">
+  <div class="swirl"></div>
+  <div class="swirl-2"></div>
+  <div class="glow"></div>
+  <div class="grain"></div>
+</div>
+
+<div class="wrap">
+  <header class="nav">
+    <a class="brand" href="/"><span class="sq">C</span>comissapro</a>
+    <nav class="nav-links">
+      <a href="#como">Como funciona</a>
+      <a href="#planos">Planos</a>
+      <a class="btn btn-ghost" href="/app">Entrar</a>
+      <a class="btn btn-mint" href="/app?mode=register&plan=pro">Começar</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1 class="hero-brand">comissapro</h1>
+      <p class="hero-line">Sua central universal de vendas e comissões — em uma loja ou em várias.</p>
+      <div class="hero-cta">
+        <a class="btn btn-mint" href="/app?mode=register&plan=pro">Começar grátis por 14 dias</a>
+        <a class="btn btn-ghost" href="#planos">Ver planos</a>
+      </div>
+      <p class="hero-note">Sem cartão no trial · Cancele quando quiser</p>
+    </section>
+
+    <section class="section" id="como">
+      <div class="section-head">
+        <h2>Do lançamento ao recebimento, em um só lugar</h2>
+        <p>Feito para vendedores, corretores e representantes que não querem planilha solta.</p>
+      </div>
+      <div class="steps">
+        <article class="step">
+          <div class="step-n">01</div>
+          <h3>Cadastre suas empresas</h3>
+          <p>Uma ou várias. Cada loja com a própria regra de comissão.</p>
+        </article>
+        <article class="step">
+          <div class="step-n">02</div>
+          <h3>Lance vendas com snapshot</h3>
+          <p>A regra da data da venda fica congelada — o passado não muda sozinho.</p>
+        </article>
+        <article class="step">
+          <div class="step-n">03</div>
+          <h3>Concilie e planeje a renda</h3>
+          <p>Bata extrato, simule metas e saiba quanto pode retirar com segurança.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="planos">
+      <div class="section-head">
+        <h2>Planos claros, lucro seu</h2>
+        <p>Escolha o que cabe no seu momento. Upgrade quando crescer.</p>
+      </div>
+
+      <div class="billing-toggle" role="group" aria-label="Ciclo de cobrança">
+        <button type="button" class="on" data-cycle="monthly">Mensal</button>
+        <button type="button" data-cycle="yearly">Anual <span class="save">−2 meses</span></button>
+      </div>
+
+      <div class="plans" id="plansGrid">
+        <!-- preenchido por home.js -->
+      </div>
+    </section>
+
+    <section class="final">
+      <h2>Comece a organizar suas comissões hoje</h2>
+      <p>14 dias para testar o Pro com conciliação, pipeline e alisamento de renda.</p>
+      <a class="btn btn-mint" href="/app?mode=register&plan=pro">Criar minha conta</a>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="brand" style="font-size:1rem"><span class="sq">C</span>comissapro</div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px 14px;justify-content:flex-end">
+      <a href="/questionario">Questionário</a>
+      <a href="/termos.html">Termos</a>
+      <a href="/privacidade.html">Privacidade</a>
+      <a href="/cookies.html">Cookies</a>
+      <a href="/cancelamento.html">Cancelamento</a>
+      <a href="/app">Abrir app</a>
+    </div>
+  </footer>
+</div>
+
+<script src="js/home.js"></script>
+<script src="js/cookies-banner.js"></script>
+</body>
+</html>
