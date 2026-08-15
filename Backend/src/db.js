@@ -264,18 +264,37 @@ async function migrate() {
 async function init() {
   if (usePostgres) {
     const { Pool } = require('pg');
+    const url = process.env.DATABASE_URL || '';
+    const sslEnv = process.env.DATABASE_SSL;
+    const needsSsl =
+      sslEnv === 'true' ||
+      (sslEnv !== 'false' &&
+        (url.includes('railway') ||
+          url.includes('sslmode=require') ||
+          url.includes('proxy.rlwy.net')));
+
     pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl:
-        process.env.DATABASE_SSL === 'true'
-          ? { rejectUnauthorized: false }
-          : undefined,
+      connectionString: url,
+      ssl: needsSsl ? { rejectUnauthorized: false } : undefined,
       max: Number(process.env.DB_POOL_MAX || 20),
       idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000,
+      connectionTimeoutMillis: 15000,
     });
-    await pool.query('SELECT 1');
-    console.log('[db] Postgres conectado');
+
+    let lastErr;
+    for (let attempt = 1; attempt <= 10; attempt++) {
+      try {
+        await pool.query('SELECT 1');
+        console.log('[db] Postgres conectado' + (needsSsl ? ' (ssl)' : ''));
+        lastErr = null;
+        break;
+      } catch (err) {
+        lastErr = err;
+        console.error(`[db] tentativa ${attempt}/10 falhou:`, err.message);
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+    }
+    if (lastErr) throw lastErr;
   } else {
     const Database = require('better-sqlite3');
     const dataDir = process.env.SQLITE_PATH

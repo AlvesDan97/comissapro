@@ -135,15 +135,23 @@ app.use((err, _req, res, _next) => {
 });
 
 async function start() {
+  console.log(`[boot] NODE_ENV=${process.env.NODE_ENV || 'undefined'} PORT=${PORT}`);
+  console.log(`[boot] DATABASE_URL=${process.env.DATABASE_URL ? 'set' : 'missing'}`);
+  console.log(`[boot] JWT_SECRET=${process.env.JWT_SECRET ? 'set' : 'missing'}`);
+
   if (isProd && !process.env.JWT_SECRET) {
-    console.error('FATAL: defina JWT_SECRET no ambiente de produção');
+    console.error('FATAL: defina JWT_SECRET nas Variables do Railway (Settings → Variables).');
     process.exit(1);
   }
+
   const info = await db.init();
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`ComissaPro site  http://localhost:${PORT}`);
-    console.log(`ComissaPro app   http://localhost:${PORT}/app`);
-    console.log(`[db] driver=${info.driver}`);
+  await new Promise((resolve, reject) => {
+    const server = app.listen(PORT, '0.0.0.0', () => {
+      console.log(`ComissaPro listening on 0.0.0.0:${PORT}`);
+      console.log(`[db] driver=${info.driver}`);
+      resolve(server);
+    });
+    server.on('error', reject);
   });
 }
 
