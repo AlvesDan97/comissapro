@@ -1,4 +1,4 @@
-/* ComissaPro — app completo */
+/* Comiss — app completo */
 const urlParams = new URLSearchParams(location.search);
 
 const state = {
@@ -893,7 +893,7 @@ function wireEvents() {
     const blob = await Api.get('/team/export.csv');
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'comissapro-export.csv'; a.click();
+    a.href = url; a.download = 'comiss-export.csv'; a.click();
     URL.revokeObjectURL(url);
   };
 

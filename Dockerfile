@@ -1,5 +1,5 @@
 # Dockerfile na raiz do repo para Railway/Docker
-# Build context = raiz do monorepo ComissaPro
+# Build context = raiz do monorepo Comiss
 
 FROM node:20-bookworm-slim
 

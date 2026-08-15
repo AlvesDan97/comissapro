@@ -135,7 +135,7 @@ router.get(
     }
     await audit(req.user.id, 'EXPORT', 'sales', null, null, { count: sales.length });
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="comissapro-export.csv"');
+    res.setHeader('Content-Disposition', 'attachment; filename="comiss-export.csv"');
     res.send('\uFEFF' + lines.join('\n'));
   })
 );

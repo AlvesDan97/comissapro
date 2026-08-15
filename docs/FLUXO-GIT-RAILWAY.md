@@ -5,13 +5,15 @@
 GitHub: https://github.com/AlvesDan97/comissapro.git
 
 ```
-comissapro/
+comissapro/          # pasta do monorepo (nome técnico no Git)
 ├── Frontend/
 ├── Backend/
 ├── Dockerfile
 ├── railway.toml
 └── docs/
 ```
+
+Marca do produto: **Comiss** · domínio: **comiss.com.br**
 
 ## Variáveis no Railway (serviço da app)
 

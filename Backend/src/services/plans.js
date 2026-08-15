@@ -1,5 +1,5 @@
 /**
- * Planos comerciais ComissaPro
+ * Planos comerciais Comiss
  * Solo R$49 · Pro R$89 · Time R$149
  */
 

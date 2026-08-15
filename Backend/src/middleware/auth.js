@@ -3,11 +3,11 @@ const jwt = require('jsonwebtoken');
 function getJwtSecret() {
   const secret = process.env.JWT_SECRET;
   const isProd = process.env.NODE_ENV === 'production';
-  if (!secret || secret === 'comissapro-dev-secret-change-in-production') {
+  if (!secret || secret === 'comiss-dev-secret-change-in-production') {
     if (isProd) {
       throw new Error('JWT_SECRET obrigatório em produção. Defina no Railway.');
     }
-    return 'comissapro-dev-secret-change-in-production';
+    return 'comiss-dev-secret-change-in-production';
   }
   if (secret.length < 24 && isProd) {
     throw new Error('JWT_SECRET deve ter pelo menos 24 caracteres.');

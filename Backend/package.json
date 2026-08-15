@@ -1,7 +1,7 @@
 {
-  "name": "comissapro-backend",
+  "name": "comiss-backend",
   "version": "1.1.0",
-  "description": "ComissaPro — API completa de gestão de vendas e comissões",
+  "description": "Comiss — API completa de gestão de vendas e comissões",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",

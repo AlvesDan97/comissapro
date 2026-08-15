@@ -1,5 +1,5 @@
 /**
- * Motor universal de comissões — ComissaPro
+ * Motor universal de comissões — Comiss
  * Tipos: fixed | bands | margin | product_table | cash_on_receipt | milestones
  */
 

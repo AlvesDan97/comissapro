@@ -301,7 +301,7 @@ async function init() {
       ? path.dirname(process.env.SQLITE_PATH)
       : path.join(__dirname, '..', 'data');
     if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-    const dbPath = process.env.SQLITE_PATH || path.join(dataDir, 'comissapro.db');
+    const dbPath = process.env.SQLITE_PATH || path.join(dataDir, 'comiss.db');
     sqlite = new Database(dbPath);
     sqlite.pragma('journal_mode = WAL');
     sqlite.pragma('foreign_keys = ON');

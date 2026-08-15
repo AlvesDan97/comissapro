@@ -1,4 +1,4 @@
-const API_BASE = window.COMISSAPRO_API || '/api';
+const API_BASE = window.COMISS_API || '/api';
 
 const Api = {
   token: localStorage.getItem('cp_token') || null,

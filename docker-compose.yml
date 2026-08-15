@@ -2,9 +2,9 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: comissapro
-      POSTGRES_PASSWORD: comissapro
-      POSTGRES_DB: comissapro
+      POSTGRES_USER: comiss
+      POSTGRES_PASSWORD: comiss
+      POSTGRES_DB: comiss
     ports:
       - "5432:5432"
     volumes:

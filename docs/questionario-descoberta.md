@@ -1,4 +1,4 @@
-# Questionário ComissaPro — Descoberta de funcionalidades
+# Questionário Comiss — Descoberta de funcionalidades
 
 **Objetivo:** entender como você trabalha hoje com vendas e comissões, para priorizar o que o app realmente precisa ter.
 
@@ -236,7 +236,7 @@ _______________________________________________
 
 ## Bloco 8 — Fechamento
 
-**Q26. Você topa testar uma versão beta do ComissaPro?**  
+**Q26. Você topa testar uma versão beta do Comiss?**  
 - [ ] Sim  
 - [ ] Talvez  
 - [ ] Não  

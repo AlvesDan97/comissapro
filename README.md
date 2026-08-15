@@ -1,4 +1,4 @@
-# ComissaPro
+# Comiss
 
 Central universal de vendas e comissões — solução completa (não MVP) para profissionais comissionados em uma ou várias empresas.
 

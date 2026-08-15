@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Questionário ComissaPro — Descoberta</title>
+<title>Questionário Comiss — Descoberta</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,600;9..40,700;9..40,800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#070809;--text:#F2F4F0;--dim:#9AA19A;--mint:#3FDA9A;--line:rgba(255,255,255,.1);--card:rgba(255,255,255,.04)}
@@ -32,7 +32,7 @@ button{border:none;border-radius:9px;padding:12px 16px;font-weight:700;cursor:po
 </head>
 <body>
 <div class="wrap">
-  <a class="brand" href="/"><span class="sq">C</span>comissapro</a>
+  <a class="brand" href="/"><span class="sq">C</span>comiss</a>
   <h1>Questionário de descoberta</h1>
   <p class="lead">Ajude a gente a entender como você trabalha com vendas e comissões. Leva cerca de 10 minutos. Não tem resposta certa — queremos o seu dia a dia real.</p>
   <div class="ok" id="okMsg">Obrigado! Suas respostas foram salvas neste navegador. Se pedirmos, é só encaminhar o arquivo baixado.</div>
@@ -283,7 +283,7 @@ document.getElementById('qForm').addEventListener('submit', (e) => {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `comissapro-resposta-${Date.now()}.json`;
+  a.download = `comiss-resposta-${Date.now()}.json`;
   a.click();
   document.getElementById('okMsg').style.display = 'block';
   window.scrollTo({ top: 0, behavior: 'smooth' });

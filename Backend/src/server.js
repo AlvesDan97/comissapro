@@ -69,7 +69,7 @@ app.get('/api/health', async (_req, res) => {
     await db.get('SELECT 1 AS ok');
     res.json({
       ok: true,
-      name: 'ComissaPro API',
+      name: 'Comiss API',
       version: '1.1.0',
       db: db.usePostgres ? 'postgres' : 'sqlite',
       time: new Date().toISOString(),
@@ -147,7 +147,7 @@ async function start() {
   const info = await db.init();
   await new Promise((resolve, reject) => {
     const server = app.listen(PORT, '0.0.0.0', () => {
-      console.log(`ComissaPro listening on 0.0.0.0:${PORT}`);
+      console.log(`Comiss listening on 0.0.0.0:${PORT}`);
       console.log(`[db] driver=${info.driver}`);
       resolve(server);
     });

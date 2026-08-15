@@ -48,7 +48,7 @@ npm start
 ```bash
 docker compose up -d
 # no Backend/.env:
-# DATABASE_URL=postgresql://comissapro:comissapro@localhost:5432/comissapro
+# DATABASE_URL=postgresql://comiss:comiss@localhost:5432/comiss
 # DATABASE_SSL=false
 npm run seed
 npm start
