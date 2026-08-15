@@ -49,11 +49,9 @@ button{font-family:inherit;cursor:pointer}
   display:flex;align-items:center;justify-content:space-between;gap:12px;
   padding:14px clamp(16px,3vw,40px);max-width:1120px;margin:0 auto;
 }
-.brand{display:flex;align-items:center;gap:8px;font-weight:800;font-size:1.05rem;letter-spacing:-.02em}
-.brand .sq{
-  width:26px;height:26px;border-radius:7px;background:var(--mint);color:#06110C;
-  display:grid;place-items:center;font-size:13px;font-weight:800;
-}
+.brand{display:flex;align-items:center;gap:8px;text-decoration:none;color:var(--text)}
+.brand .logo{height:28px;width:auto;display:block}
+.logo{height:28px;width:auto;display:block}
 .nav-links{display:flex;align-items:center;gap:12px;font-size:13.5px;color:var(--text-dim)}
 .nav-links a:hover{color:var(--text)}
 .btn{
@@ -72,8 +70,12 @@ button{font-family:inherit;cursor:pointer}
   padding:20px clamp(16px,3vw,40px) 36px;max-width:1120px;margin:0 auto;
 }
 .hero-brand{
-  font-size:clamp(2.4rem,6.5vw,4.2rem);font-weight:800;letter-spacing:-.04em;line-height:.95;
-  margin:0 0 12px;animation:rise .7s ease both;
+  margin:0 0 14px;animation:rise .7s ease both;
+  line-height:0;
+}
+.hero-brand .logo,
+.hero-logo{
+  height:clamp(52px,11vw,88px);width:auto;display:block;max-width:min(100%,420px);
 }
 .hero-line{
   max-width:36ch;font-size:clamp(1rem,1.8vw,1.2rem);color:var(--text-dim);

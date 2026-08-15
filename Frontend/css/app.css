@@ -55,8 +55,10 @@ button{cursor:pointer}
 
 #splash{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-direction:column;z-index:200;transition:opacity .6s,visibility .6s}
 #splash.hide{opacity:0;visibility:hidden;pointer-events:none}
-.splash-mark{font-weight:800;font-size:30px;letter-spacing:-.02em;display:flex;align-items:center;gap:8px}
-.splash-mark .sq,.login-brand .sq,.sidebar-brand .sq{width:26px;height:26px;border-radius:7px;background:var(--mint);display:flex;align-items:center;justify-content:center;color:#06110C;font-weight:800;font-size:14px}
+.splash-mark{display:flex;align-items:center;justify-content:center}
+.splash-mark .logo{height:48px;width:auto;display:block}
+.login-brand .logo{height:32px;width:auto;display:block}
+.sidebar-brand .logo{height:28px;width:auto;display:block}
 .splash-tag{margin-top:9px;font-size:12.5px;color:var(--text-dim)}
 .splash-ladder{display:flex;gap:6px;margin-top:32px}
 .splash-ladder span{width:6px;border-radius:2px;background:var(--mint);animation:riselad 1.1s ease-in-out infinite}
@@ -71,7 +73,6 @@ button{cursor:pointer}
 .login-card,.wizard-card{width:100%;max-width:420px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:34px 28px;position:relative;z-index:1}
 .wizard-card{max-width:560px}
 .login-brand{display:flex;align-items:center;gap:9px;margin-bottom:4px}
-.login-brand .name,.sidebar-brand .name{font-weight:700;font-size:16px}
 .login-title{font-size:22px;font-weight:700;margin:20px 0 4px}
 .login-sub{color:var(--text-dim);font-size:13.5px;margin:0 0 22px}
 .field{margin-bottom:13px}
@@ -109,6 +110,7 @@ button{cursor:pointer}
 .shell{display:flex;min-height:100vh}
 .sidebar{width:240px;flex-shrink:0;background:rgba(10,10,11,.45);border-right:1px solid var(--border-soft);display:none;flex-direction:column;padding:22px 14px;position:sticky;top:0;height:100vh;overflow-y:auto}
 .sidebar-brand{display:flex;align-items:center;gap:9px;padding:0 6px 18px}
+.logo{height:28px;width:auto;display:block}
 .nav-group-label{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--text-faint);padding:14px 10px 6px;font-weight:700}
 .nav-item{display:flex;align-items:center;gap:11px;padding:9px 10px;border-radius:var(--radius-sm);color:var(--text-dim);font-size:13px;font-weight:500;border:none;background:none;width:100%;text-align:left;margin-bottom:2px}
 .nav-item .ico{width:26px;height:26px;border-radius:7px;background:var(--bg-elev);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px}
