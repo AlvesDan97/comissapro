@@ -5,15 +5,22 @@ const { authRequired } = require('../middleware/auth');
 const { asyncHandler } = require('../middleware/asyncHandler');
 const { audit } = require('../services/audit');
 const { calculateCommission } = require('../services/commissionEngine');
+const { DEFAULT_RULES } = require('../services/commissionEngine');
+const { mapRow, calculateEntry, resolveDueDate, usesMonthRecalc } = require('../services/commissionTypes');
+const { recalcMonthSales } = require('../services/monthLadder');
+const { workspaceId, requireLaunch, requireActiveWorkspace } = require('../services/scope');
 
 const router = express.Router();
 router.use(authRequired);
+router.use(requireActiveWorkspace);
 
 function mapSale(row) {
   return {
     id: row.id,
     storeId: row.store_id,
     leadId: row.lead_id,
+    sellerId: row.seller_id || row.user_id,
+    sellerName: row.seller_name || null,
     title: row.title,
     clientName: row.client_name,
     status: row.status,
@@ -26,7 +33,8 @@ function mapSale(row) {
     splitPartner: row.split_partner,
     splitPercent: row.split_percent,
     ruleVersionId: row.rule_version_id,
-    snapshot: JSON.parse(row.snapshot_json),
+    commissionTypeId: row.commission_type_id,
+    snapshot: JSON.parse(row.snapshot_json || '{}'),
     commissionOfficial: row.commission_official,
     commissionExtra: row.commission_extra,
     commissionTotal: row.commission_total,
@@ -34,6 +42,41 @@ function mapSale(row) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+async function ensureStore(userId) {
+  const existing = await db.get(
+    'SELECT * FROM stores WHERE user_id=? AND active=1 ORDER BY created_at ASC LIMIT ?',
+    [userId, 1]
+  );
+  if (existing) return existing;
+  const now = new Date().toISOString();
+  const id = uuid();
+  await db.run(
+    `INSERT INTO stores (id, user_id, name, color, logo_initials, payment_days, rule_type, rule_json, created_at, updated_at)
+     VALUES (?, ?, 'Geral', '#3FDA9A', 'GE', 30, 'fixed', ?, ?, ?)`,
+    [id, userId, JSON.stringify(DEFAULT_RULES.fixed), now, now]
+  );
+  return db.get('SELECT * FROM stores WHERE id=?', [id]);
+}
+
+async function monthStatsForType(userId, typeId, saleDate, sellerId) {
+  const month = (saleDate || new Date().toISOString()).slice(0, 7);
+  const row = await db.get(
+    `SELECT COUNT(*) as c, COALESCE(SUM(gross_value),0) as revenue
+     FROM sales WHERE user_id=? AND commission_type_id=? AND substr(sale_date,1,7)=? AND status!='cancelada'
+       AND COALESCE(seller_id, user_id)=?`,
+    [userId, typeId, month, sellerId]
+  );
+  return { monthCount: Number(row?.c) || 0, monthRevenue: Number(row?.revenue) || 0 };
+}
+
+async function loadCommissionType(userId, typeId) {
+  const row = await db.get(
+    'SELECT * FROM commission_types WHERE id=? AND user_id=? AND active=1',
+    [typeId, userId]
+  );
+  return row ? mapRow(row) : null;
 }
 
 async function getRuleForDate(storeId, userId, saleDate) {
@@ -141,10 +184,20 @@ router.get(
   '/',
   asyncHandler(async (req, res) => {
     const { status, storeId, from, to, q } = req.query;
-    let sql = `SELECT s.*, st.name as store_name FROM sales s
-             JOIN stores st ON st.id = s.store_id
+    let sql = `SELECT s.*, st.name as store_name, ct.name as commission_name, u.name as seller_name
+             FROM sales s
+             LEFT JOIN stores st ON st.id = s.store_id
+             LEFT JOIN commission_types ct ON ct.id = s.commission_type_id
+             LEFT JOIN users u ON u.id = COALESCE(s.seller_id, s.user_id)
              WHERE s.user_id = ?`;
-    const params = [req.user.id];
+    const params = [workspaceId(req)];
+    if (!req.user.canSeeTeam) {
+      sql += ' AND COALESCE(s.seller_id, s.user_id)=?';
+      params.push(req.user.id);
+    } else if (req.query.sellerId) {
+      sql += ' AND COALESCE(s.seller_id, s.user_id)=?';
+      params.push(req.query.sellerId);
+    }
     if (status && status !== 'todas') {
       sql += ' AND s.status = ?';
       params.push(status);
@@ -152,6 +205,10 @@ router.get(
     if (storeId) {
       sql += ' AND s.store_id = ?';
       params.push(storeId);
+    }
+    if (req.query.commissionTypeId) {
+      sql += ' AND s.commission_type_id = ?';
+      params.push(req.query.commissionTypeId);
     }
     if (from) {
       sql += ' AND s.sale_date >= ?';
@@ -168,7 +225,11 @@ router.get(
     sql += ' ORDER BY s.sale_date DESC, s.created_at DESC';
     const rows = await db.all(sql, params);
     res.json({
-      sales: rows.map((r) => ({ ...mapSale(r), storeName: r.store_name })),
+      sales: rows.map((r) => ({
+        ...mapSale(r),
+        storeName: r.store_name,
+        commissionName: r.commission_name,
+      })),
     });
   })
 );
@@ -177,12 +238,17 @@ router.get(
   '/:id',
   asyncHandler(async (req, res) => {
     const row = await db.get(
-      `SELECT s.*, st.name as store_name FROM sales s
-       JOIN stores st ON st.id = s.store_id
+      `SELECT s.*, st.name as store_name, ct.name as commission_name
+       FROM sales s
+       LEFT JOIN stores st ON st.id = s.store_id
+       LEFT JOIN commission_types ct ON ct.id = s.commission_type_id
        WHERE s.id=? AND s.user_id=?`,
-      [req.params.id, req.user.id]
+      [req.params.id, workspaceId(req)]
     );
     if (!row) return res.status(404).json({ error: 'Venda não encontrada' });
+    if (!req.user.canSeeTeam && (row.seller_id || row.user_id) !== req.user.id && row.seller_id && row.seller_id !== req.user.id) {
+      return res.status(404).json({ error: 'Venda não encontrada' });
+    }
     const receivables = (
       await db.all('SELECT * FROM receivables WHERE sale_id=? ORDER BY due_date', [row.id])
     ).map((r) => ({
@@ -194,14 +260,143 @@ router.get(
       paidDate: r.paid_date,
       status: r.status,
     }));
-    res.json({ sale: { ...mapSale(row), storeName: row.store_name }, receivables });
+    res.json({
+      sale: { ...mapSale(row), storeName: row.store_name, commissionName: row.commission_name },
+      receivables,
+    });
+  })
+);
+
+router.post(
+  '/preview',
+  asyncHandler(async (req, res) => {
+    const body = req.body || {};
+    const type = await loadCommissionType(workspaceId(req), body.commissionTypeId);
+    if (!type) return res.status(400).json({ error: 'Selecione uma comissão.' });
+    const saleDate = body.saleDate || new Date().toISOString().slice(0, 10);
+    const stats = await monthStatsForType(workspaceId(req), type.id, saleDate, req.user.id);
+    const calc = calculateEntry(type, {
+      grossValue: body.grossValue,
+      quantity: body.quantity,
+      costValue: body.costValue,
+      commissionAmount: body.commissionAmount,
+      flexAmount: body.flexAmount,
+      flexPercent: body.flexPercent,
+      ...stats,
+    });
+    res.json({
+      preview: {
+        amount: calc.amount,
+        note: calc.note,
+        bandLabel: calc.bandLabel,
+        receiveLabel: type.receiveLabel,
+        dueDate: resolveDueDate(type, saleDate, body.receiveDate),
+        monthCount: stats.monthCount,
+        monthLadder: calc.monthLadder,
+      },
+    });
   })
 );
 
 router.post(
   '/',
+  requireLaunch,
   asyncHandler(async (req, res) => {
     const body = req.body || {};
+    const ws = workspaceId(req);
+
+    if (body.commissionTypeId) {
+      const type = await loadCommissionType(ws, body.commissionTypeId);
+      if (!type) return res.status(400).json({ error: 'Selecione uma comissão.' });
+      const saleDate = body.saleDate || new Date().toISOString().slice(0, 10);
+      if (type.receiveWhen === 'per_entry' && !body.receiveDate) {
+        return res.status(400).json({ error: 'Informe quando você recebe esta comissão.' });
+      }
+      if (type.calcType === 'prize' && (body.commissionAmount === undefined || body.commissionAmount === null || body.commissionAmount === '')) {
+        return res.status(400).json({ error: 'Informe o valor da premiação.' });
+      }
+      const store = await ensureStore(ws);
+      const stats = await monthStatsForType(ws, type.id, saleDate, req.user.id);
+      const calc = calculateEntry(type, {
+        grossValue: body.grossValue,
+        quantity: body.quantity,
+        costValue: body.costValue,
+        commissionAmount: body.commissionAmount,
+        flexAmount: body.flexAmount,
+        flexPercent: body.flexPercent,
+        ...stats,
+      });
+      const now = new Date().toISOString();
+      const id = uuid();
+      const title = String(body.clientName || type.name).trim() || type.name;
+      const snapshot = {
+        source: 'commission_type',
+        commissionTypeId: type.id,
+        commissionName: type.name,
+        calcType: type.calcType,
+        config: type.config,
+        bandLabel: calc.bandLabel,
+        engineNote: calc.note,
+        calculatedAt: now,
+        monthCountAtSale: stats.monthCount + 1,
+        monthRecalc: type.calcType === 'flex' || type.calcType === 'prize' ? false : usesMonthRecalc(type),
+        manualAmount: type.calcType === 'prize' ? calc.amount : undefined,
+      };
+      const nicheFields = {
+        quantity: Number(body.quantity) || 1,
+        cost: Number(body.costValue) || 0,
+        phone: String(body.phone || '').trim().slice(0, 40),
+        email: String(body.email || '').trim().slice(0, 120),
+        flexAmount: Number(body.flexAmount) || 0,
+        flexPercent: Number(body.flexPercent) || 0,
+      };
+
+      await db.run(
+        `INSERT INTO sales (
+          id, user_id, store_id, lead_id, title, client_name, status, sale_date,
+          gross_value, accessories_value, extras_value, niche_fields, split_enabled,
+          split_partner, split_percent, rule_version_id, commission_type_id, snapshot_json,
+          commission_official, commission_extra, commission_total, notes, created_at, updated_at, seller_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, 0, NULL, 0, NULL, ?, ?, ?, 0, ?, ?, ?, ?, ?)`,
+        [
+          id,
+          ws,
+          store.id,
+          body.leadId || null,
+          title,
+          body.clientName || null,
+          'pendente',
+          saleDate,
+          Number(body.grossValue) || 0,
+          JSON.stringify(nicheFields),
+          type.id,
+          JSON.stringify(snapshot),
+          calc.amount,
+          calc.amount,
+          body.notes || null,
+          now,
+          now,
+          req.user.id,
+        ]
+      );
+
+      const saleRow = await db.get('SELECT * FROM sales WHERE id=?', [id]);
+      const dueStr = resolveDueDate(type, saleDate, body.receiveDate);
+      const recNow = new Date().toISOString();
+      await db.run(
+        `INSERT INTO receivables (id, sale_id, user_id, label, amount, kind, due_date, status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, 'oficial', ?, 'previsto', ?, ?)`,
+        [uuid(), id, ws, type.name, calc.amount, dueStr, recNow, recNow]
+      );
+
+      await recalcMonthSales(ws, type, saleDate, req.user.id);
+
+      const refreshed = await db.get('SELECT * FROM sales WHERE id=?', [id]);
+      const sale = mapSale(refreshed || saleRow);
+      await audit(req.user.id, 'CREATE', 'sale', id, null, sale);
+      return res.status(201).json({ sale: { ...sale, commissionName: type.name } });
+    }
+
     const store = await db.get('SELECT * FROM stores WHERE id=? AND user_id=?', [
       body.storeId,
       req.user.id,
@@ -301,14 +496,18 @@ router.post(
 router.patch(
   '/:id',
   asyncHandler(async (req, res) => {
-    const row = await db.get('SELECT * FROM sales WHERE id=? AND user_id=?', [
-      req.params.id,
-      req.user.id,
-    ]);
+    const ws = workspaceId(req);
+    const row = await db.get('SELECT * FROM sales WHERE id=? AND user_id=?', [req.params.id, ws]);
     if (!row) return res.status(404).json({ error: 'Venda não encontrada' });
+    const seller = row.seller_id || row.user_id;
+    if (!req.user.canSeeTeam && seller !== req.user.id) {
+      return res.status(404).json({ error: 'Venda não encontrada' });
+    }
+    if (!req.user.canLaunch && !req.user.canSeeTeam) {
+      return res.status(403).json({ error: 'Seu papel é somente leitura.' });
+    }
 
     const before = mapSale(row);
-    // RN-01: alteração de valores NÃO recalcula com regra nova — só status/notas/extra manual
     const { status, notes, commissionExtra, clientName } = req.body || {};
     const nextExtra = commissionExtra !== undefined ? Number(commissionExtra) : row.commission_extra;
     const nextOfficial = row.commission_official;
@@ -325,7 +524,7 @@ router.patch(
         clientName !== undefined ? clientName : row.client_name,
         new Date().toISOString(),
         row.id,
-        req.user.id,
+        ws,
       ]
     );
 
@@ -342,6 +541,11 @@ router.patch(
       ]);
     }
 
+    if (row.commission_type_id && nextStatus !== before.status && (nextStatus === 'cancelada' || before.status === 'cancelada')) {
+      const type = await loadCommissionType(ws, row.commission_type_id);
+      if (type) await recalcMonthSales(ws, type, row.sale_date, seller);
+    }
+
     const updated = mapSale(await db.get('SELECT * FROM sales WHERE id=?', [row.id]));
     await audit(req.user.id, 'UPDATE', 'sale', row.id, before, updated);
     res.json({ sale: updated });
@@ -350,14 +554,23 @@ router.patch(
 
 router.delete(
   '/:id',
+  requireLaunch,
   asyncHandler(async (req, res) => {
-    const row = await db.get('SELECT * FROM sales WHERE id=? AND user_id=?', [
-      req.params.id,
-      req.user.id,
-    ]);
+    const ws = workspaceId(req);
+    const row = await db.get('SELECT * FROM sales WHERE id=? AND user_id=?', [req.params.id, ws]);
     if (!row) return res.status(404).json({ error: 'Venda não encontrada' });
+    const seller = row.seller_id || row.user_id;
+    if (!req.user.canSeeTeam && seller !== req.user.id) {
+      return res.status(404).json({ error: 'Venda não encontrada' });
+    }
     const before = mapSale(row);
+    const typeId = row.commission_type_id;
+    const saleDate = row.sale_date;
     await db.run('DELETE FROM sales WHERE id=?', [row.id]);
+    if (typeId) {
+      const type = await loadCommissionType(ws, typeId);
+      if (type) await recalcMonthSales(ws, type, saleDate, seller);
+    }
     await audit(req.user.id, 'DELETE', 'sale', row.id, before, null);
     res.json({ ok: true });
   })

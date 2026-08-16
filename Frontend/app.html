@@ -49,6 +49,21 @@
     </label>
     <button class="btn-primary" id="btnAuth">Entrar</button>
     <p class="login-alt" id="authToggleWrap">Novo por aqui? <a id="authToggle">Criar conta</a></p>
+    <p class="login-alt" style="margin-top:6px"><a id="authForgotLink" style="cursor:pointer;color:var(--mint)">Esqueci minha senha</a></p>
+    <div id="forgotBox" class="hidden" style="margin-top:10px">
+      <div class="field"><label>E-mail para redefinir</label><input id="forgotEmail" type="email"></div>
+      <button class="btn-secondary" type="button" id="btnForgot">Enviar link</button>
+    </div>
+    <div id="resetBox" class="hidden" style="margin-top:10px">
+      <div class="field"><label>Nova senha</label><input id="resetPassword" type="password"></div>
+      <button class="btn-primary" type="button" id="btnReset">Salvar nova senha</button>
+    </div>
+    <div id="inviteBox" class="hidden" style="margin-top:10px">
+      <p class="login-sub" id="inviteHint">Você foi convidado para um espaço.</p>
+      <div class="field"><label>Seu nome</label><input id="inviteJoinName" type="text"></div>
+      <div class="field"><label>Crie uma senha</label><input id="inviteJoinPassword" type="password"></div>
+      <button class="btn-primary" type="button" id="btnAcceptInvite">Entrar no espaço</button>
+    </div>
     <p class="login-alt" style="margin-top:8px;font-size:11px">Demo: marina.souza@exemplo.com / demo1234</p>
     <p class="login-alt" style="margin-top:10px;font-size:11px">
       <a href="/termos.html" target="_blank" style="color:var(--text-dim)">Termos</a> ·
@@ -58,42 +73,66 @@
   </div>
 </div>
 
-<!-- ONBOARDING -->
+<!-- ONBOARDING: 1. Perfil → 2. Comissões → 3. Pronto -->
 <div id="onboarding">
-  <div class="wizard-card" id="wizardNiche">
-    <div class="login-brand"><img class="logo" src="/img/logo-comiss.png" alt="Comiss"></div>
-    <div class="login-title">Qual é o seu principal mercado?</div>
-    <p class="login-sub">Personalizamos formulários e regras para o seu nicho.</p>
-    <div class="niche-grid" id="nicheGrid"></div>
-    <button class="btn-primary" id="btnNicheNext" disabled>Continuar</button>
-  </div>
-  <div class="wizard-card hidden" id="wizardMulti">
-    <div class="login-title">Você vende em quantas empresas?</div>
-    <p class="login-sub">O Comiss atende quem tem uma loja ou várias.</p>
-    <div class="choice-row">
-      <button type="button" data-multi="0" class="on">Uma empresa</button>
-      <button type="button" data-multi="1">Várias empresas</button>
+  <div class="wizard-card" id="wizardProfile">
+    <div class="ob-steps" aria-label="Progresso">
+      <span class="on">1. Perfil</span>
+      <span>2. Comissões</span>
+      <span>3. Pronto</span>
     </div>
-    <button class="btn-primary" id="btnMultiNext">Continuar</button>
-  </div>
-  <div class="wizard-card hidden" id="wizardStore">
-    <div class="login-title">Cadastre sua primeira loja</div>
-    <p class="login-sub">Qual é a primeira loja ou empresa que você atende?</p>
-    <div class="field"><label>Nome</label><input id="firstStoreName" placeholder="Ex: Concessionária Ford Sul"></div>
-    <div class="field"><label>CNPJ (opcional)</label><input id="firstStoreCnpj" placeholder="00.000.000/0000-00"></div>
-    <div class="field"><label>Cor de identificação</label><input id="firstStoreColor" type="color" value="#3FDA9A"></div>
-    <div class="field"><label>Modelo de comissão</label>
-      <select id="firstStoreRule">
-        <option value="bands">Faixas progressivas por meta</option>
-        <option value="fixed">Percentual fixo</option>
-        <option value="margin">Margem de lucro</option>
-        <option value="product_table">Tabela por produto</option>
-        <option value="cash_on_receipt">No recebimento (caixa)</option>
-        <option value="milestones">Marcos (sinal/escritura)</option>
+    <div class="login-brand"><img class="logo" src="/img/logo-comiss.png" alt="Comiss"></div>
+    <div class="login-title">Seu perfil</div>
+    <p class="login-sub">Dados profissionais. Nome, foto e senha ficam na conta — aqui o app aprende como te chamar e em qual moeda calcular.</p>
+    <div class="field"><label>Nome</label><input id="obName" type="text" placeholder="Seu nome"></div>
+    <div class="field"><label>Profissão / Área</label><input id="obProfession" type="text" placeholder="Ex.: Consultor de Vendas"></div>
+    <div class="field"><label>Empresa (opcional)</label><input id="obCompany" type="text" placeholder="Onde você vende hoje"></div>
+    <div class="field"><label>Moeda</label>
+      <select id="obCurrency">
+        <option value="BRL" selected>R$ — Real Brasileiro</option>
+        <option value="USD">US$ — Dólar</option>
+        <option value="EUR">€ — Euro</option>
       </select>
     </div>
-    <div class="field"><label>Prazo padrão de pagamento (dias)</label><input id="firstStoreDays" type="number" value="30"></div>
-    <button class="btn-primary" id="btnFinishOnboarding">Entrar no painel</button>
+    <button class="btn-primary" id="btnProfileNext">Continuar</button>
+  </div>
+
+  <div class="wizard-card hidden" id="wizardCommissions">
+    <div class="ob-steps" aria-label="Progresso">
+      <span>1. Perfil</span>
+      <span class="on">2. Comissões</span>
+      <span>3. Pronto</span>
+    </div>
+    <div class="login-title">Configure suas comissões</div>
+    <p class="login-sub">Cadastre como você recebe. Pode ser uma regra ou várias — principal, documentação, acessórios…</p>
+    <div id="obCommissionList"></div>
+    <button class="add-card" id="btnObAddCommission" type="button">＋ Adicionar comissão</button>
+    <button class="btn-primary" id="btnObCommissionsNext" style="margin-top:14px" disabled>Continuar</button>
+  </div>
+
+  <div class="wizard-card hidden" id="wizardCommissionForm">
+    <div class="ob-steps" aria-label="Progresso">
+      <span>1. Perfil</span>
+      <span class="on">2. Comissões</span>
+      <span>3. Pronto</span>
+    </div>
+    <button type="button" class="back-link" id="btnObFormBack">← Voltar</button>
+    <div class="login-title" id="obFormTitle">Nova comissão</div>
+    <p class="login-sub">Os campos mudam de acordo com o tipo escolhido.</p>
+    <div id="obCfError" class="error-box hidden"></div>
+    <div id="obCfMount"></div>
+    <button type="button" class="btn-primary" id="btnObSaveCommission">Salvar comissão</button>
+  </div>
+
+  <div class="wizard-card hidden" id="wizardReady">
+    <div class="ob-steps" aria-label="Progresso">
+      <span>1. Perfil</span>
+      <span>2. Comissões</span>
+      <span class="on">3. Pronto</span>
+    </div>
+    <div class="login-title" id="readyTitle">Pronto para lançar</div>
+    <p class="login-sub" id="readySub">Suas regras estão salvas. No próximo passo você vê Minhas Comissões e pode editar quando quiser.</p>
+    <button class="btn-primary" id="btnFinishOnboarding">Ir para minhas comissões</button>
   </div>
 </div>
 
@@ -103,19 +142,19 @@
     <aside class="sidebar">
       <div class="sidebar-brand"><img class="logo" src="/img/logo-comiss.png" alt="Comiss"></div>
       <div class="nav-group-label">Visão geral</div>
-      <button class="nav-item active" data-screen="dashboard"><span class="ico">▣</span>Painel</button>
-      <button class="nav-item" data-screen="lojas"><span class="ico">⌂</span>Lojas</button>
+      <button class="nav-item" data-screen="comissoes"><span class="ico">%</span>Comissões</button>
+      <button class="nav-item" data-screen="dashboard"><span class="ico">▣</span>Painel</button>
       <button class="nav-item" data-screen="vendas"><span class="ico">☰</span>Vendas</button>
-      <button class="nav-item" data-screen="pipeline"><span class="ico">◎</span>Pipeline</button>
-      <button class="nav-item" data-screen="recebiveis"><span class="ico">₿</span>Recebíveis</button>
+      <button class="nav-item" data-screen="pipeline" data-nav="pipeline"><span class="ico">◎</span>Pipeline</button>
       <div class="nav-group-label">Recursos</div>
       <button class="nav-item" data-screen="simulador"><span class="ico">↕</span>Simulador</button>
-      <button class="nav-item" data-screen="reconciliacao"><span class="ico">✓</span>Conciliação</button>
-      <button class="nav-item" data-screen="alisamento"><span class="ico">≈</span>Alisamento</button>
+      <button class="nav-item" data-screen="metas"><span class="ico">◎</span>Metas</button>
+      <button class="nav-item" data-screen="comparar"><span class="ico">↕</span>Comparar</button>
+      <button class="nav-item" data-screen="pendencias"><span class="ico">!</span>Pendências</button>
       <div class="nav-group-label">Conta</div>
-      <button class="nav-item" data-screen="equipe"><span class="ico">☺</span>Equipe</button>
-      <button class="nav-item" data-screen="auditoria"><span class="ico">▤</span>Auditoria</button>
-      <button class="nav-item" data-screen="planos"><span class="ico">◆</span>Planos</button>
+      <button class="nav-item" data-screen="perfil"><span class="ico">👤</span>Perfil</button>
+      <button class="nav-item" data-screen="equipe" data-nav="equipe"><span class="ico">☺</span>Equipe</button>
+      <button class="nav-item" data-screen="planos" data-nav="planos"><span class="ico">◆</span>Planos</button>
       <button class="nav-item" data-screen="config"><span class="ico">⚙</span>Configurações</button>
       <a href="/" style="display:block;margin:12px 10px 0;font-size:12px;color:var(--text-faint);text-decoration:none">← Site Comiss</a>
       <div class="sidebar-foot">
@@ -130,85 +169,90 @@
 
     <div class="main">
       <div class="topbar">
-        <div class="topbar-title" id="pageTitle">Painel</div>
+        <div class="topbar-title" id="pageTitle">Minhas Comissões</div>
         <div class="search-pill">
-          <input id="globalSearch" placeholder="Buscar venda, loja, cliente...">
+          <input id="globalSearch" placeholder="Buscar venda ou cliente...">
         </div>
         <div class="topbar-right">
           <span class="offline-pill" id="offlinePill">Offline</span>
-          <div class="store-select">
-            <select id="storeFilter"><option value="">Todas as lojas</option></select>
-          </div>
+          <button class="icon-btn bell-btn" id="btnInbox" title="Notificações" type="button">
+            ⌁<span class="bell-badge hidden" id="inboxBadge">0</span>
+          </button>
           <button class="icon-btn" id="btnExport" title="Exportar CSV">↓</button>
           <div class="user-pill"><div class="avatar" id="topAvatar" style="width:26px;height:26px;font-size:10px">MS</div><span class="who" id="topName">—</span></div>
         </div>
       </div>
 
-      <!-- DASHBOARD -->
-      <section class="screen active" id="screen-dashboard">
-        <div class="dash-grid">
-          <div>
-            <div class="hero-row">
-              <div>
-                <div class="hero-label">Comissão do mês</div>
-                <div class="hero-value mono" id="kpiCommission">R$ 0</div>
-                <div class="hero-sub" id="kpiSalesCount">0 vendas neste ciclo</div>
-              </div>
-              <button class="hero-add" id="btnNewSaleHero" type="button">+</button>
-            </div>
-            <div class="kpi-grid">
-              <div class="kpi-card"><div class="lbl">Recebida / quitada</div><div class="val mono" id="kpiReceived">R$ 0</div><div class="sub">Oficial + por fora</div></div>
-              <div class="kpi-card"><div class="lbl">Pipeline a receber</div><div class="val mono" id="kpiPipeline">R$ 0</div><div class="sub">Previsto / parcial / atraso</div></div>
-              <div class="kpi-card"><div class="lbl">Faturamento vendas</div><div class="val mono" id="kpiRevenue">R$ 0</div><div class="sub">Período atual</div></div>
-            </div>
-            <div class="section-title">Por loja</div>
-            <div class="mini-grid" id="byStoreCards"></div>
-            <div class="section-title">Evolução</div>
-            <div class="analytics-card">
-              <div class="an-head">
-                <div class="an-toggle">
-                  <button class="on" id="tglComissao" type="button">Comissão</button>
-                  <button id="tglFaturamento" type="button">Faturamento</button>
-                </div>
-              </div>
-              <svg viewBox="0 0 600 160" width="100%" height="160" id="mainChart" preserveAspectRatio="none"></svg>
-              <div class="chart-axis" id="chartAxis"></div>
-            </div>
-            <div class="section-title">Faixa de comissão</div>
-            <div class="ladder-card" id="ladderCard">
-              <div class="ladder-head">
-                <div><h4 id="ladderStore">—</h4><p id="ladderUnits">—</p></div>
-                <div class="ladder-badge" id="ladderBadge">—</div>
-              </div>
-              <div class="ladder-steps" id="ladderSteps"></div>
-              <div class="ladder-labels" id="ladderLabels"></div>
-              <div class="ladder-note" id="ladderNote"></div>
-            </div>
-          </div>
-          <div>
-            <div class="op-card">
-              <div class="op-tabs">
-                <button class="on" type="button">Atalhos</button>
-              </div>
-              <button class="btn-primary" id="btnNewSaleSide">Registrar nova venda</button>
-              <button class="btn-secondary" data-go="reconciliacao">Conciliação de extratos</button>
-              <button class="btn-secondary" data-go="pipeline">Ver pipeline</button>
-              <button class="btn-secondary" data-go="alisamento">Alisamento de renda</button>
-            </div>
-            <div class="section-title">Últimas vendas</div>
-            <div class="op-card" id="recentSales" style="padding:8px 16px"></div>
-          </div>
+      <!-- MINHAS COMISSÕES -->
+      <section class="screen" id="screen-comissoes">
+        <p class="screen-lead" id="commLead">Configure como você recebe suas comissões.</p>
+        <div class="section-title" style="margin-top:8px">Minhas comissões</div>
+        <div id="commissionsList"></div>
+        <button class="add-card" id="btnAddCommission" type="button">＋ Adicionar comissão</button>
+      </section>
+
+      <!-- FORMULÁRIO DE COMISSÃO -->
+      <section class="screen" id="screen-comissao-form">
+        <button type="button" class="back-link" id="btnCfBack">← Minhas comissões</button>
+        <h2 class="form-page-title" id="cfPageTitle">Nova comissão</h2>
+        <p class="screen-lead">Os campos mudam de acordo com o tipo escolhido.</p>
+        <div id="cfError" class="error-box hidden"></div>
+        <div id="cfMount"></div>
+        <div class="form-actions">
+          <button type="button" class="btn-primary" id="btnSaveCommission">Salvar comissão</button>
+          <button type="button" class="btn-secondary hidden" id="btnDeleteCommission">Excluir comissão</button>
         </div>
       </section>
 
-      <!-- LOJAS -->
-      <section class="screen" id="screen-lojas">
-        <div class="section-title" style="margin-top:0">Parceiros ativos <button class="link" id="btnAddStore">+ Nova loja</button></div>
-        <div class="stores-grid" id="storesList"></div>
-        <div class="section-title">Editor de regras</div>
-        <div class="op-card" id="ruleEditor">
-          <p class="empty">Selecione uma loja para editar as regras.</p>
+      <!-- PERFIL -->
+      <section class="screen" id="screen-perfil">
+        <p class="screen-lead" id="perfilHello">Seus dados profissionais.</p>
+        <div class="settings-card">
+          <div class="field"><label>Nome</label><input id="pfName" type="text"></div>
+          <div class="field"><label>Profissão / Área</label><input id="pfProfession" type="text" placeholder="Ex.: Consultor de Vendas"></div>
+          <div class="field"><label>Empresa (opcional)</label><input id="pfCompany" type="text"></div>
+          <div class="field"><label>Moeda</label>
+            <select id="pfCurrency">
+              <option value="BRL">R$ — Real Brasileiro</option>
+              <option value="USD">US$ — Dólar</option>
+              <option value="EUR">€ — Euro</option>
+            </select>
+          </div>
+          <button class="btn-primary" id="btnSaveProfile">Salvar perfil</button>
         </div>
+      </section>
+
+      <!-- DASHBOARD -->
+      <section class="screen active" id="screen-dashboard">
+        <p class="screen-lead" id="dashHello">Acompanhe o mês e lance pela comissão.</p>
+        <div class="filter-row hidden" id="dashScopeTabs">
+          <button class="chip on" type="button" data-scope="workspace">Espaço</button>
+          <button class="chip" type="button" data-scope="me">Pessoal</button>
+        </div>
+        <div id="receiveConfirmBanner" class="receive-banner hidden"></div>
+        <div id="dashGoalBox" class="goal-bar hidden"></div>
+        <div class="hero-row">
+          <div>
+            <div class="hero-label" id="dashMonthLabel">Comissão do mês</div>
+            <div class="hero-value mono" id="kpiCommission">R$ 0</div>
+            <div class="hero-sub" id="kpiSalesCount">0 lançamentos</div>
+          </div>
+        </div>
+        <div class="kpi-grid dash-mini-kpis">
+          <div class="kpi-card"><div class="lbl">A receber</div><div class="val mono" id="kpiPipeline">R$ 0</div></div>
+          <div class="kpi-card"><div class="lbl">Já recebido</div><div class="val mono" id="kpiReceived">R$ 0</div></div>
+          <div class="kpi-card"><div class="lbl">Hoje</div><div class="val mono" id="kpiToday">R$ 0</div></div>
+        </div>
+        <div id="dashRankingWrap" class="hidden">
+          <div class="section-title">Ranking</div>
+          <div id="dashRanking"></div>
+        </div>
+        <div id="dashAlerts"></div>
+        <div class="section-title">Carteira</div>
+        <p class="screen-lead" style="margin-top:-4px">Toque na comissão para ver os lançamentos. Use Lançar para registrar uma nova.</p>
+        <div id="dashCommissionList"></div>
+        <div class="section-title">Últimos lançamentos</div>
+        <div class="op-card" id="recentSales" style="padding:8px 16px"></div>
       </section>
 
       <!-- VENDAS -->
@@ -233,74 +277,107 @@
         <div id="leadsList"></div>
       </section>
 
-      <!-- RECEBÍVEIS -->
-      <section class="screen" id="screen-recebiveis">
-        <div class="section-title" style="margin-top:0">Calendário de recebíveis</div>
-        <div id="receivablesList"></div>
-      </section>
-
       <!-- SIMULADOR -->
       <section class="screen" id="screen-simulador">
-        <div class="section-title" style="margin-top:0">Simulador "E se…"</div>
+        <div class="section-title" style="margin-top:0">Simulador rápido</div>
+        <p class="screen-lead">Escolha uma comissão da sua carteira e veja o que você receberia.</p>
         <div class="sim-grid">
           <div class="sim-card">
-            <h4 style="margin:0 0 4px;font-size:14px">Ajuste os cenários</h4>
-            <p style="font-size:11.5px;color:var(--text-faint);margin:0 0 16px">Impacto imediato na faixa de comissão.</p>
-            <div class="form-field" style="margin-bottom:14px"><label>Loja</label><select id="simStore"></select></div>
-            <div class="slider-row"><div class="slider-head"><span>Vendas adicionais</span><span class="val" id="simUnitsVal">3 un.</span></div><input type="range" min="0" max="15" value="3" id="simUnits"></div>
-            <div class="slider-row"><div class="slider-head"><span>Ticket médio</span><span class="val" id="simTicketVal">R$ 68.000</span></div><input type="range" min="20000" max="300000" step="1000" value="68000" id="simTicket"></div>
+            <div class="field"><label>Comissão</label><select id="simCommission"></select></div>
+            <div class="field" id="simValueWrap"><label>Valor da venda</label>
+              <input id="simValue" type="number" min="0" step="0.01" value="100000"></div>
+            <div class="field hidden" id="simFlexWrap"><label>Flexibilização (%)</label>
+              <div class="suffix-input"><input id="simFlex" type="number" min="0" step="0.01" value="0"><span>%</span></div></div>
+            <div class="field hidden" id="simQtyWrap"><label>Quantidade</label>
+              <input id="simQty" type="number" min="1" step="1" value="1"></div>
+            <div class="field hidden" id="simPrizeWrap"><label>Valor da premiação</label>
+              <input id="simPrize" type="number" min="0" step="0.01" value="0"></div>
+            <div class="field hidden" id="simCostWrap"><label>Custo</label>
+              <input id="simCost" type="number" min="0" step="0.01" value="0"></div>
           </div>
           <div class="sim-result">
-            <div class="lbl">Comissão projetada</div>
+            <div class="lbl">Você receberia</div>
             <div class="num" id="simResult">R$ 0</div>
-            <div class="diff" id="simDiff">—</div>
+            <div class="diff" id="simNote">—</div>
           </div>
-        </div>
-        <div class="section-title">Projeção da escada</div>
-        <div class="ladder-card">
-          <div class="ladder-head"><div><h4 id="simProjLabel">—</h4><p>Projeção</p></div><div class="ladder-badge" id="simBadge">—</div></div>
-          <div class="ladder-steps" id="ladderStepsSim"></div>
-          <div class="ladder-labels" id="ladderLabelsSim"></div>
-        </div>
-      </section>
-
-      <!-- CONCILIAÇÃO -->
-      <section class="screen" id="screen-reconciliacao">
-        <div class="section-title" style="margin-top:0">Smart Reconciliation</div>
-        <div class="upload-zone">
-          <div style="font-size:28px;margin-bottom:10px;color:var(--mint)">↑</div>
-          <div style="font-weight:700;margin-bottom:4px">Envie o relatório da empresa</div>
-          <div style="font-size:12px;color:var(--text-faint);margin-bottom:16px">PDF ou Excel — cruzamos com suas vendas</div>
-          <input type="file" id="reconFile" accept=".pdf,.xls,.xlsx,.csv" hidden>
-          <button class="upload-btn" id="btnRecon" type="button">Selecionar arquivo</button>
-        </div>
-        <div id="reconResults"></div>
-      </section>
-
-      <!-- ALISAMENTO -->
-      <section class="screen" id="screen-alisamento">
-        <div class="section-title" style="margin-top:0">Alisamento de renda</div>
-        <div class="kpi-grid" id="smoothKpis"></div>
-        <div class="op-card" style="margin-top:16px">
-          <p id="smoothSuggestion" style="margin:0;font-size:14px;line-height:1.5;color:var(--text-dim)"></p>
-        </div>
-        <div class="section-title">Histórico 12 meses</div>
-        <div class="analytics-card">
-          <svg viewBox="0 0 600 160" width="100%" height="160" id="smoothChart" preserveAspectRatio="none"></svg>
-          <div class="chart-axis" id="smoothAxis"></div>
         </div>
       </section>
 
       <!-- EQUIPE -->
       <section class="screen" id="screen-equipe">
-        <div class="section-title" style="margin-top:0">Equipe & split <button class="link" id="btnInvite">+ Convidar</button></div>
+        <div class="section-title" style="margin-top:0">Equipe <button class="link" id="btnInvite">+ Convidar</button></div>
+        <p class="screen-lead" id="teamLimits"></p>
         <div id="teamList"></div>
+        <div id="extraSeatBox" class="settings-card hidden" style="margin-top:16px">
+          <div class="section-title" style="margin-top:0">Assentos extras</div>
+          <p class="screen-lead">Time inclui 3 pessoas. Extra: R$ 59/mês cada.</p>
+          <div class="field"><label>Quantidade extra</label><input id="extraSeatsInput" type="number" min="0" step="1" value="0"></div>
+          <button class="btn-secondary" type="button" id="btnSaveSeats">Atualizar assentos</button>
+        </div>
       </section>
 
-      <!-- AUDITORIA -->
-      <section class="screen" id="screen-auditoria">
-        <div class="section-title" style="margin-top:0">Trilha de auditoria</div>
-        <div class="op-card" id="auditList"></div>
+      <!-- METAS -->
+      <section class="screen" id="screen-metas">
+        <div class="section-title" style="margin-top:0">Metas <button class="link" id="btnAddGoal">+ Nova meta</button></div>
+        <p class="screen-lead">Mês, ano ou intervalo. Alvo em R$ de comissão ou quantidade de lançamentos.</p>
+        <div id="goalsList"></div>
+        <div class="settings-card hidden" id="goalForm">
+          <div class="field"><label>Nome (opcional)</label><input id="goalName" placeholder="Ex.: Agosto"></div>
+          <div class="field"><label>Período</label>
+            <select id="goalPeriod">
+              <option value="month">Mês atual</option>
+              <option value="year">Ano atual</option>
+              <option value="range">Intervalo</option>
+            </select>
+          </div>
+          <div class="form-grid hidden" id="goalRangeWrap">
+            <div class="form-field"><label>De</label><input id="goalFrom" type="date"></div>
+            <div class="form-field"><label>Até</label><input id="goalTo" type="date"></div>
+          </div>
+          <div class="field"><label>Métrica</label>
+            <select id="goalMetric">
+              <option value="commission">Comissão (R$)</option>
+              <option value="quantity">Quantidade de lançamentos</option>
+            </select>
+          </div>
+          <div class="field"><label>Alvo</label><input id="goalTarget" type="number" min="0" step="0.01"></div>
+          <div class="field"><label>Pessoa</label><select id="goalSeller"><option value="">Espaço todo</option></select></div>
+          <div class="field"><label>Comissão</label><select id="goalCommission"><option value="">Carteira toda</option></select></div>
+          <button class="btn-primary" type="button" id="btnSaveGoal">Salvar meta</button>
+        </div>
+      </section>
+
+      <!-- COMPARAR -->
+      <section class="screen" id="screen-comparar">
+        <div class="section-title" style="margin-top:0">Comparar</div>
+        <p class="screen-lead">Dia, mês ou ano. No Pro/Time o dono quebra por vendedor.</p>
+        <div class="form-grid" style="margin-bottom:14px">
+          <div class="form-field"><label>De</label><input type="date" id="cmpFrom"></div>
+          <div class="form-field"><label>Até</label><input type="date" id="cmpTo"></div>
+          <div class="form-field"><label>Agrupar</label>
+            <select id="cmpGroup"><option value="month">Mês</option><option value="day">Dia</option><option value="year">Ano</option></select>
+          </div>
+          <div class="form-field"><label>Métrica</label><select id="cmpMetric"></select></div>
+          <div class="form-field" id="cmpSellerWrap"><label>Vendedor</label><select id="cmpSeller"><option value="">Todos</option></select></div>
+          <div class="form-field"><label>Comissão</label><select id="cmpCommission"><option value="">Todas</option></select></div>
+        </div>
+        <button class="btn-secondary" type="button" id="btnRunCompare">Atualizar</button>
+        <div class="kpi-grid dash-mini-kpis" style="margin-top:16px" id="cmpTotals"></div>
+        <div id="cmpTable" style="margin-top:12px"></div>
+        <div class="section-title">Métricas salvas</div>
+        <div id="savedMetricsList"></div>
+        <div class="settings-card" id="savedMetricForm">
+          <div class="field"><label>Nome</label><input id="smName" placeholder="Ex.: 0km da Marina"></div>
+          <div class="field"><label>Do catálogo</label><select id="smKey"></select></div>
+          <button class="btn-secondary" type="button" id="btnSaveMetric">Salvar no catálogo do espaço</button>
+        </div>
+      </section>
+
+      <!-- PENDÊNCIAS -->
+      <section class="screen" id="screen-pendencias">
+        <div class="section-title" style="margin-top:0">Fila de follow-up</div>
+        <p class="screen-lead">O Comiss junta o que ainda precisa de ação: recebimento, lead parado, convite e trial.</p>
+        <div id="pendenciasList"></div>
       </section>
 
       <!-- PLANOS -->
@@ -323,15 +400,21 @@
           <div class="toggle-field" style="margin:0 0 10px"><span>Autenticação 2FA (OTP)</span><button class="switch" id="cfg2fa" type="button"></button></div>
           <div class="toggle-field" style="margin:0 0 10px"><span>Biometria nativa</span><button class="switch" id="cfgBio" type="button"></button></div>
           <div class="kv"><span>Plano atual</span><span id="cfgPlan">—</span></div>
-          <div class="kv"><span>Nicho</span><span id="cfgNiche">—</span></div>
-          <div class="kv"><span>Multi-lojas</span><span id="cfgMulti">—</span></div>
           <div class="kv" style="border:none"><span>Criptografia</span><span>TLS 1.3 + AES-256 (em repouso no servidor)</span></div>
           <button class="btn-secondary" data-go="planos">Gerenciar plano</button>
           <a class="btn-secondary" href="/termos.html" target="_blank" style="display:block;text-align:center;text-decoration:none;line-height:1.2;padding-top:14px">Termos de Uso</a>
           <a class="btn-secondary" href="/privacidade.html" target="_blank" style="display:block;text-align:center;text-decoration:none;line-height:1.2;padding-top:14px">Política de Privacidade</a>
           <a class="btn-secondary" href="/cookies.html" target="_blank" style="display:block;text-align:center;text-decoration:none;line-height:1.2;padding-top:14px">Política de Cookies</a>
-          <a class="btn-secondary" href="/cancelamento.html" target="_blank" style="display:block;text-align:center;text-decoration:none;line-height:1.2;padding-top:14px">Cancelamento e Reembolso</a>
+          <a class="btn-secondary" href="/cancelamento.html" target="_blank" style="display:block;text-align:center;text-decoration:none;line-height:1.2;padding-top:14px">Cancelamento</a>
           <button class="btn-secondary" id="btnLogout">Sair da conta</button>
+        </div>
+        <div class="section-title">Avisos por e-mail</div>
+        <p class="screen-lead">Convite e redefinição de senha sempre saem. O resto você escolhe.</p>
+        <div class="settings-card">
+          <div class="toggle-field" style="margin:0 0 10px"><span>Recebimento para confirmar</span><button class="switch on" id="prefEmailReceivable" type="button" data-pref="emailReceivable"></button></div>
+          <div class="toggle-field" style="margin:0 0 10px"><span>Lead parado no pipeline</span><button class="switch on" id="prefEmailLead" type="button" data-pref="emailLead"></button></div>
+          <div class="toggle-field" style="margin:0 0 10px"><span>Mês grátis acabando</span><button class="switch on" id="prefEmailTrial" type="button" data-pref="emailTrial"></button></div>
+          <div class="toggle-field" style="margin:0"><span>Lembrete de convite pendente</span><button class="switch on" id="prefEmailInviteRemind" type="button" data-pref="emailInviteRemind"></button></div>
         </div>
       </section>
     </div>
@@ -339,24 +422,48 @@
 
   <button class="fab" id="fabNewSale" type="button">+</button>
   <nav class="bottom-nav" id="bottomNav">
+    <button class="bn-item" data-screen="comissoes">Comissões</button>
     <button class="bn-item active" data-screen="dashboard">Painel</button>
-    <button class="bn-item" data-screen="lojas">Lojas</button>
     <button class="bn-item" data-screen="vendas">Vendas</button>
-    <button class="bn-item" data-screen="pipeline">Pipeline</button>
-    <button class="bn-item" data-screen="simulador">Simular</button>
-    <button class="bn-item" data-screen="reconciliacao">Conciliar</button>
-    <button class="bn-item" data-screen="planos">Planos</button>
+    <button class="bn-item" data-screen="perfil">Perfil</button>
     <button class="bn-item" data-screen="config">Conta</button>
   </nav>
 </div>
 
-<!-- MODAL VENDA -->
+<!-- INBOX -->
+<div class="overlay" id="inboxOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h3>Notificações</h3><button class="sheet-close" type="button" data-close="inboxOverlay">✕</button></div>
+    <div class="inbox-actions">
+      <button class="link" type="button" id="btnReadAll">Marcar todas como lidas</button>
+      <button class="link" type="button" data-go="pendencias" data-close="inboxOverlay">Ver pendências</button>
+    </div>
+    <div id="inboxList"></div>
+  </div>
+</div>
+
+<!-- MODAL HISTÓRICO DA COMISSÃO -->
+<div class="overlay" id="historyOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h3 id="historyTitle">Lançamentos</h3><button class="sheet-close" type="button" data-close="historyOverlay">✕</button></div>
+    <p class="screen-lead" id="historySub"></p>
+    <div id="historyList"></div>
+    <button type="button" class="btn-primary" style="margin-top:16px" id="btnHistoryLaunch">Lançar nesta comissão</button>
+  </div>
+</div>
+
+<!-- MODAL LANÇAMENTO -->
 <div class="overlay" id="saleOverlay">
   <div class="sheet">
     <div class="sheet-handle"></div>
-    <div class="sheet-head"><h3>Nova venda</h3><button class="sheet-close" type="button" data-close="saleOverlay">✕</button></div>
-    <div class="form-grid" id="saleForm"></div>
-    <button class="btn-primary" style="margin-top:20px" id="btnSaveSale">Registrar venda</button>
+    <div class="sheet-head"><h3 id="launchTitle">Lançar</h3><button class="sheet-close" type="button" data-close="saleOverlay">✕</button></div>
+    <p class="screen-lead" id="launchRule"></p>
+    <div id="saleForm"></div>
+    <div class="launch-preview" id="launchPreview"></div>
+    <div id="launchError" class="error-box hidden"></div>
+    <button type="button" class="btn-primary" style="margin-top:16px" id="btnSaveSale">Lançar</button>
   </div>
 </div>
 
@@ -373,16 +480,6 @@
       </div>
     </div>
     <button class="btn-primary" style="margin-top:12px" id="btnUpdateSale">Salvar status</button>
-  </div>
-</div>
-
-<!-- MODAL LOJA -->
-<div class="overlay" id="storeOverlay">
-  <div class="sheet">
-    <div class="sheet-handle"></div>
-    <div class="sheet-head"><h3>Nova loja / fornecedor</h3><button class="sheet-close" type="button" data-close="storeOverlay">✕</button></div>
-    <div class="form-grid" id="storeForm"></div>
-    <button class="btn-primary" style="margin-top:20px" id="btnSaveStore">Salvar loja</button>
   </div>
 </div>
 
@@ -415,6 +512,7 @@
 </div>
 
 <script src="js/api.js"></script>
+<script src="js/commissions.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

@@ -11,6 +11,7 @@ async function clearAll() {
     'sales',
     'leads',
     'commission_rule_versions',
+    'commission_types',
     'stores',
     'team_members',
     'audit_logs',
@@ -37,8 +38,8 @@ async function main() {
   const password_hash = bcrypt.hashSync('demo1234', 12);
 
   await db.run(
-    `INSERT INTO users (id, email, password_hash, name, niche, multi_store, onboarding_done, twofa_enabled, biometry_enabled, theme, plan, billing_cycle, plan_status, plan_started_at, accepted_terms_at, accepted_privacy_at, created_at, updated_at)
-     VALUES (?, ?, ?, ?, 'automotivo', 1, 1, 0, 1, 'dark', 'pro', 'monthly', 'active', ?, ?, ?, ?, ?)`,
+    `INSERT INTO users (id, email, password_hash, name, niche, multi_store, onboarding_done, twofa_enabled, biometry_enabled, theme, plan, billing_cycle, plan_status, plan_started_at, accepted_terms_at, accepted_privacy_at, profession, company, currency, created_at, updated_at)
+     VALUES (?, ?, ?, ?, 'automotivo', 1, 1, 0, 1, 'dark', 'pro', 'monthly', 'active', ?, ?, ?, 'Consultora de Vendas', 'Ford Sul / Chevrolet Norte', 'BRL', ?, ?)`,
     [userId, 'marina.souza@exemplo.com', password_hash, 'Marina Souza', now, now, now, now, now]
   );
 
@@ -213,6 +214,68 @@ async function main() {
      VALUES (?, ?, 'parceiro@exemplo.com', 'Carlos Split', 'editor', 'accepted', ?)`,
     [uuid(), userId, now]
   );
+
+  const demoCommissions = [
+    {
+      name: 'Comissão principal',
+      calcType: 'percent',
+      config: { percent: 0.5, appliedOn: 'entry_value' },
+      generatedWhen: 'on_entry',
+      receiveWhen: 'next_month',
+    },
+    {
+      name: 'Documentação',
+      calcType: 'bands',
+      config: {
+        appliedOn: 'entry_value',
+        mode: 'percent',
+        bands: [
+          { min: 0, max: 80000, value: 0.2 },
+          { min: 80000, max: 150000, value: 0.35 },
+          { min: 150000, max: null, value: 0.5 },
+        ],
+      },
+      generatedWhen: 'on_entry',
+      receiveWhen: 'next_month',
+    },
+    {
+      name: 'Acessórios',
+      calcType: 'goal',
+      config: {
+        basis: 'units',
+        bands: [
+          { min: 1, max: 4, percent: 0.3 },
+          { min: 5, max: 7, percent: 0.4 },
+          { min: 8, max: 10, percent: 0.55 },
+          { min: 11, max: null, percent: 0.7 },
+        ],
+      },
+      generatedWhen: 'on_entry',
+      receiveWhen: 'next_month',
+    },
+  ];
+
+  for (let i = 0; i < demoCommissions.length; i++) {
+    const c = demoCommissions[i];
+    await db.run(
+      `INSERT INTO commission_types (
+        id, user_id, name, calc_type, config_json, generated_when,
+        receive_when, receive_days, receive_date, sort_order, active, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, 1, ?, ?)`,
+      [
+        uuid(),
+        userId,
+        c.name,
+        c.calcType,
+        JSON.stringify(c.config),
+        c.generatedWhen,
+        c.receiveWhen,
+        i,
+        now,
+        now,
+      ]
+    );
+  }
 
   console.log('Seed OK');
   console.log('Login: marina.souza@exemplo.com / demo1234');

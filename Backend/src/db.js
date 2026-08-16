@@ -69,6 +69,25 @@ CREATE TABLE IF NOT EXISTS users (
   plan_started_at TEXT,
   accepted_terms_at TEXT,
   accepted_privacy_at TEXT,
+  profession TEXT,
+  company TEXT,
+  currency TEXT DEFAULT 'BRL',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS commission_types (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  calc_type TEXT NOT NULL,
+  config_json TEXT NOT NULL,
+  generated_when TEXT NOT NULL DEFAULT 'on_entry',
+  receive_when TEXT NOT NULL DEFAULT 'next_month',
+  receive_days INTEGER,
+  receive_date TEXT,
+  sort_order INTEGER DEFAULT 0,
+  active INTEGER DEFAULT 1,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -131,6 +150,7 @@ CREATE TABLE IF NOT EXISTS sales (
   split_partner TEXT,
   split_percent DOUBLE PRECISION DEFAULT 0,
   rule_version_id TEXT,
+  commission_type_id TEXT REFERENCES commission_types(id) ON DELETE SET NULL,
   snapshot_json TEXT NOT NULL,
   commission_official DOUBLE PRECISION DEFAULT 0,
   commission_extra DOUBLE PRECISION DEFAULT 0,
@@ -215,6 +235,7 @@ CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(sale_date);
 CREATE INDEX IF NOT EXISTS idx_leads_user ON leads(user_id);
 CREATE INDEX IF NOT EXISTS idx_receivables_user ON receivables(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_commission_types_user ON commission_types(user_id);
 `;
 
 async function ensureColumn(table, column, ddl) {
@@ -259,6 +280,103 @@ async function migrate() {
   await ensureColumn('users', 'plan_started_at', 'plan_started_at TEXT');
   await ensureColumn('users', 'accepted_terms_at', 'accepted_terms_at TEXT');
   await ensureColumn('users', 'accepted_privacy_at', 'accepted_privacy_at TEXT');
+  await ensureColumn('users', 'profession', 'profession TEXT');
+  await ensureColumn('users', 'company', 'company TEXT');
+  await ensureColumn('users', 'currency', "currency TEXT DEFAULT 'BRL'");
+  await ensureColumn('sales', 'commission_type_id', 'commission_type_id TEXT');
+  await ensureColumn('sales', 'seller_id', 'seller_id TEXT');
+  await ensureColumn('users', 'workspace_id', 'workspace_id TEXT');
+  await ensureColumn('users', 'workspace_role', "workspace_role TEXT DEFAULT 'owner'");
+  await ensureColumn('users', 'trial_ends_at', 'trial_ends_at TEXT');
+  await ensureColumn('users', 'extra_seats', 'extra_seats INTEGER DEFAULT 0');
+  await ensureColumn('users', 'asaas_customer_id', 'asaas_customer_id TEXT');
+  await ensureColumn('users', 'asaas_subscription_id', 'asaas_subscription_id TEXT');
+  await ensureColumn('users', 'reset_token', 'reset_token TEXT');
+  await ensureColumn('users', 'reset_token_expires', 'reset_token_expires TEXT');
+  await ensureColumn('team_members', 'member_user_id', 'member_user_id TEXT');
+  await ensureColumn('team_members', 'invite_token', 'invite_token TEXT');
+  await ensureColumn('team_members', 'invite_expires_at', 'invite_expires_at TEXT');
+  await ensureColumn('users', 'notify_prefs_json', "notify_prefs_json TEXT DEFAULT '{}'");
+
+  const goalType = usePostgres ? 'DOUBLE PRECISION' : 'REAL';
+  await exec(`
+    CREATE TABLE IF NOT EXISTS goals (
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL,
+      seller_id TEXT,
+      commission_type_id TEXT,
+      period_type TEXT NOT NULL,
+      period_start TEXT NOT NULL,
+      period_end TEXT NOT NULL,
+      metric TEXT NOT NULL DEFAULT 'commission',
+      target ${goalType} NOT NULL DEFAULT 0,
+      name TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
+  await exec(`
+    CREATE TABLE IF NOT EXISTS saved_metrics (
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      catalog_key TEXT NOT NULL,
+      filters_json TEXT NOT NULL DEFAULT '{}',
+      pin_dashboard INTEGER DEFAULT 0,
+      pin_compare INTEGER DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
+  await exec(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      workspace_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      body TEXT DEFAULT '',
+      link TEXT,
+      read_at TEXT,
+      email_sent_at TEXT,
+      created_at TEXT NOT NULL
+    )
+  `);
+  await exec(`
+    CREATE TABLE IF NOT EXISTS followups (
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL,
+      seller_id TEXT,
+      type TEXT NOT NULL,
+      ref_type TEXT,
+      ref_id TEXT,
+      title TEXT NOT NULL,
+      body TEXT DEFAULT '',
+      due_at TEXT,
+      status TEXT NOT NULL DEFAULT 'open',
+      notified_once INTEGER DEFAULT 0,
+      last_notified_at TEXT,
+      done_at TEXT,
+      done_by TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
+  await exec(`CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at)`);
+  await exec(`CREATE INDEX IF NOT EXISTS idx_followups_ws ON followups(workspace_id, status)`);
+
+  await exec(`UPDATE users SET workspace_id = id WHERE workspace_id IS NULL OR workspace_id = ''`);
+  await exec(`UPDATE users SET workspace_role = 'owner' WHERE workspace_id = id AND (workspace_role IS NULL OR workspace_role = '')`);
+  await exec(`UPDATE sales SET seller_id = user_id WHERE seller_id IS NULL OR seller_id = ''`);
+  const needTrial = await all(
+    `SELECT id, plan_started_at FROM users WHERE trial_ends_at IS NULL AND plan_started_at IS NOT NULL`
+  );
+  for (const u of needTrial) {
+    const d = new Date(u.plan_started_at);
+    if (Number.isNaN(d.getTime())) continue;
+    d.setDate(d.getDate() + 30);
+    await run(`UPDATE users SET trial_ends_at=? WHERE id=?`, [d.toISOString(), u.id]);
+  }
 }
 
 async function init() {

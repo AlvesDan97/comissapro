@@ -36,6 +36,7 @@ const Api = {
     }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
+      if (res.status === 401) Api.setToken(null);
       const error = new Error(data.error || 'Erro na API');
       error.status = res.status;
       error.data = data;

@@ -17,6 +17,13 @@ const state = {
   selectedNiche: null,
   multiStore: 0,
   editingStoreId: null,
+  catalog: null,
+  commissions: [],
+  commissionDraft: null,
+  commissionFormReturn: 'comissoes',
+  launchCommission: null,
+  dashScope: null,
+  metricCatalog: [],
 };
 
 const NICHES = [
@@ -37,16 +44,17 @@ const RULE_LABELS = {
 };
 
 const TITLES = {
+  comissoes: 'Minhas Comissões',
+  'comissao-form': 'Comissão',
+  perfil: 'Perfil',
   dashboard: 'Painel',
-  lojas: 'Lojas & Fornecedores',
   vendas: 'Extrato de Vendas',
   pipeline: 'Pipeline',
-  recebiveis: 'Recebíveis',
-  simulador: 'Simulador de Metas',
-  reconciliacao: 'Conciliação',
-  alisamento: 'Alisamento de Renda',
-  equipe: 'Equipe & Split',
-  auditoria: 'Auditoria',
+  simulador: 'Simulador',
+  metas: 'Metas',
+  comparar: 'Comparar',
+  equipe: 'Equipe',
+  pendencias: 'Pendências',
   planos: 'Planos',
   config: 'Configurações',
 };
@@ -67,6 +75,9 @@ function nicheLabel(id) {
   return NICHES.find((n) => n.id === id)?.t || id || '—';
 }
 function $(id) { return document.getElementById(id); }
+function escHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
 function show(el) { el.classList.add('show'); el.classList.remove('hidden'); }
 function hide(el) { el.classList.remove('show'); }
 
@@ -159,21 +170,29 @@ async function doAuth() {
 
 function startOnboarding() {
   show($('onboarding'));
-  $('wizardNiche').classList.remove('hidden');
-  $('wizardMulti').classList.add('hidden');
-  $('wizardStore').classList.add('hidden');
-  renderNiches();
+  showWizard('wizardProfile');
+  $('obName').value = state.user?.name || '';
+  $('obProfession').value = state.user?.profession || '';
+  $('obCompany').value = state.user?.company || '';
+  $('obCurrency').value = state.user?.currency || 'BRL';
 }
 
-async function enterApp() {
+function showWizard(id) {
+  ['wizardProfile', 'wizardCommissions', 'wizardCommissionForm', 'wizardReady'].forEach((w) => {
+    $(w).classList.toggle('hidden', w !== id);
+  });
+}
+
+async function enterApp(startScreen) {
   hide($('onboarding'));
   hide($('login'));
   $('splash').classList.add('hide');
   show($('app'));
   applyUserChrome();
-  await refreshStores();
-  await goTo('dashboard');
+  await Promise.all([refreshStores(), loadCommissionCatalog()]);
+  await goTo(startScreen || 'dashboard');
   flushOfflineQueue();
+  startInboxPoll();
 }
 
 function applyUserChrome() {
@@ -184,19 +203,40 @@ function applyUserChrome() {
   $('topAvatar').textContent = ini;
   $('sideName').textContent = u.name;
   $('topName').textContent = u.name.split(' ')[0];
-  $('sideRole').textContent = `${nicheLabel(u.niche)} · ${u.multiStore ? 'Multilojas' : '1 empresa'}`;
+  $('sideRole').textContent = u.profession || u.company || 'Vendedor';
   document.body.classList.toggle('theme-light', u.theme === 'light');
   document.querySelectorAll('.theme-toggle button').forEach((b) => {
     b.classList.toggle('on', b.dataset.theme === (u.theme || 'dark'));
   });
   $('cfg2fa').classList.toggle('on', !!u.twofaEnabled);
   $('cfgBio').classList.toggle('on', !!u.biometryEnabled);
-  $('cfgNiche').textContent = nicheLabel(u.niche);
-  $('cfgMulti').textContent = u.multiStore ? 'Sim' : 'Não';
+  if ($('cfgNiche')) $('cfgNiche').textContent = nicheLabel(u.niche);
+  if ($('cfgMulti')) $('cfgMulti').textContent = u.multiStore ? 'Sim' : 'Não';
   if ($('cfgPlan')) {
     const status = u.planStatus === 'trialing' ? 'trial' : u.planStatus || '—';
     $('cfgPlan').textContent = `${u.planName || u.plan || '—'} · ${status}`;
   }
+  applyNavAccess();
+}
+
+function roleLabel(u) {
+  if (!u) return '—';
+  if (u.isOwner) return u.planName || 'Dono';
+  const map = { admin: 'Admin', editor: 'Lançar', viewer: 'Ver', owner: 'Dono' };
+  return map[u.workspaceRole] || u.profession || 'Vendedor';
+}
+
+function applyNavAccess() {
+  const u = state.user;
+  if (!u) return;
+  $('sideRole').textContent = roleLabel(u);
+  const showPipeline = ['pro', 'time'].includes(u.plan);
+  const showTeam = u.canSeeTeam && ['pro', 'time'].includes(u.plan);
+  const showPlanos = !!u.isOwner;
+  document.querySelectorAll('[data-nav="pipeline"]').forEach((el) => el.classList.toggle('hidden', !showPipeline));
+  document.querySelectorAll('[data-nav="equipe"]').forEach((el) => el.classList.toggle('hidden', !showTeam));
+  document.querySelectorAll('[data-nav="planos"]').forEach((el) => el.classList.toggle('hidden', !showPlanos));
+  document.body.classList.toggle('role-viewer', !u.canLaunch);
 }
 
 /* ---------- Navigation ---------- */
@@ -205,42 +245,285 @@ async function goTo(name) {
   const screen = $(`screen-${name}`);
   if (screen) screen.classList.add('active');
   document.querySelectorAll('.nav-item, .bn-item').forEach((b) => {
-    b.classList.toggle('active', b.dataset.screen === name);
+    const on =
+      b.dataset.screen === name ||
+      (name === 'comissao-form' && b.dataset.screen === 'comissoes');
+    b.classList.toggle('active', on);
   });
   $('pageTitle').textContent = TITLES[name] || name;
   window.scrollTo({ top: 0, behavior: 'smooth' });
+  const hideFab = name === 'comissao-form' || name === 'perfil' || name === 'comissoes' || name === 'dashboard';
+  if ($('fabNewSale')) $('fabNewSale').classList.toggle('hidden', hideFab);
 
   if (name === 'dashboard') await loadDashboard();
-  if (name === 'lojas') await loadStoresScreen();
+  if (name === 'comissoes') await loadCommissionsScreen();
+  if (name === 'perfil') loadProfileScreen();
   if (name === 'vendas') await loadSales();
   if (name === 'pipeline') await loadLeads();
-  if (name === 'recebiveis') await loadReceivables();
   if (name === 'simulador') await loadSimulator();
-  if (name === 'alisamento') await loadSmoothing();
   if (name === 'equipe') await loadTeam();
-  if (name === 'auditoria') await loadAudit();
+  if (name === 'metas') await loadGoals();
+  if (name === 'comparar') await loadCompare();
   if (name === 'planos') await loadPlansScreen();
-  if (name === 'config') applyUserChrome();
+  if (name === 'pendencias') await loadPendencias();
+  if (name === 'config') {
+    applyUserChrome();
+    await loadNotifyPrefs();
+  }
+}
+
+let inboxTimer = null;
+async function refreshInboxBadge() {
+  if (!Api.token) return;
+  try {
+    const data = await Api.get('/inbox/unread');
+    const n = Number(data.unread) || 0;
+    const badge = $('inboxBadge');
+    if (!badge) return;
+    badge.textContent = n > 99 ? '99+' : String(n);
+    badge.classList.toggle('hidden', n === 0);
+  } catch (_) { /* sessão expirada */ }
+}
+function startInboxPoll() {
+  refreshInboxBadge();
+  if (inboxTimer) clearInterval(inboxTimer);
+  inboxTimer = setInterval(refreshInboxBadge, 45000);
+}
+async function openInbox() {
+  show($('inboxOverlay'));
+  const data = await Api.get('/inbox/notifications');
+  const list = $('inboxList');
+  if (!data.notifications?.length) {
+    list.innerHTML = '<p class="empty">Nenhuma notificação ainda.</p>';
+  } else {
+    list.innerHTML = data.notifications
+      .map(
+        (n) => `<button class="notify-row ${n.read ? '' : 'unread'}" type="button" data-nid="${n.id}">
+          <span class="notify-dot"></span>
+          <div><div class="notify-title">${escHtml(n.title)}</div>
+          <div class="notify-body">${escHtml(n.body || '')}</div></div>
+        </button>`
+      )
+      .join('');
+    list.querySelectorAll('[data-nid]').forEach((btn) => {
+      btn.onclick = async () => {
+        await Api.post(`/inbox/notifications/${btn.dataset.nid}/read`, {});
+        hide($('inboxOverlay'));
+        await goTo('pendencias');
+        refreshInboxBadge();
+      };
+    });
+  }
+  refreshInboxBadge();
+}
+async function loadPendencias() {
+  const { followups } = await Api.get('/inbox/followups');
+  const typeLabel = {
+    receivable_due: 'Recebimento',
+    lead_stale: 'Lead',
+    invite_pending: 'Convite',
+    trial_ending: 'Trial',
+  };
+  $('pendenciasList').innerHTML = followups.length
+    ? followups
+        .map(
+          (f) => `<div class="pend-card">
+            <h4>${escHtml(f.title)}</h4>
+            <p>${escHtml(typeLabel[f.type] || f.type)} · ${escHtml(f.body || '')}</p>
+            <button class="btn-secondary" type="button" data-done="${f.id}">Marcar como feito</button>
+          </div>`
+        )
+        .join('')
+    : '<p class="empty">Nada pendente agora. Quando um recebimento vencer, um lead parar ou o trial acabar, aparece aqui.</p>';
+  $('pendenciasList').querySelectorAll('[data-done]').forEach((btn) => {
+    btn.onclick = async () => {
+      await Api.post(`/inbox/followups/${btn.dataset.done}/done`, {});
+      await loadPendencias();
+      refreshInboxBadge();
+    };
+  });
+  refreshInboxBadge();
+}
+async function loadNotifyPrefs() {
+  try {
+    const { prefs } = await Api.get('/inbox/prefs');
+    document.querySelectorAll('[data-pref]').forEach((btn) => {
+      btn.classList.toggle('on', prefs[btn.dataset.pref] !== false);
+    });
+  } catch (_) { /* ignore */ }
+}
+
+/* ---------- Perfil & comissões do vendedor ---------- */
+async function loadCommissionCatalog() {
+  if (state.catalog) return state.catalog;
+  try {
+    state.catalog = await Api.get('/commissions/catalog');
+  } catch {
+    state.catalog = window.CommissionUI.FALLBACK_CATALOG;
+  }
+  return state.catalog;
+}
+
+async function refreshCommissions() {
+  const { commissions } = await Api.get('/commissions');
+  state.commissions = commissions || [];
+  return state.commissions;
+}
+
+function firstName() {
+  return (state.user?.name || '').split(/\s+/)[0] || 'olá';
+}
+
+async function loadCommissionsScreen() {
+  await refreshCommissions();
+  $('commLead').textContent = `Olá, ${firstName()}! Configure como você recebe suas comissões.`;
+  $('commissionsList').innerHTML = CommissionUI.listHtml(state.commissions);
+  const canManage = !!state.user?.canManage;
+  if ($('btnAddCommission')) $('btnAddCommission').classList.toggle('hidden', !canManage);
+  $('commissionsList').querySelectorAll('[data-edit-commission]').forEach((btn) => {
+    if (!canManage) {
+      btn.classList.add('hidden');
+      return;
+    }
+    btn.onclick = () => openCommissionForm(btn.dataset.editCommission, 'comissoes');
+  });
+}
+
+function loadProfileScreen() {
+  const u = state.user || {};
+  $('perfilHello').textContent = `Olá, ${firstName()}! Seus dados profissionais.`;
+  $('pfName').value = u.name || '';
+  $('pfProfession').value = u.profession || '';
+  $('pfCompany').value = u.company || '';
+  $('pfCurrency').value = u.currency || 'BRL';
+}
+
+async function saveProfileFrom(nameId, professionId, companyId, currencyId) {
+  const name = $(nameId).value.trim();
+  if (!name) throw new Error('Informe seu nome.');
+  const data = await Api.patch('/auth/me', {
+    name,
+    profession: $(professionId).value.trim(),
+    company: $(companyId).value.trim(),
+    currency: $(currencyId).value,
+  });
+  state.user = data.user;
+  applyUserChrome();
+}
+
+function renderCommissionForm(mountId) {
+  const catalog = state.catalog || CommissionUI.FALLBACK_CATALOG;
+  const root = $(mountId);
+  root.innerHTML = CommissionUI.formHtml(state.commissionDraft, catalog);
+  CommissionUI.bindForm(root, state.commissionDraft, catalog, () => renderCommissionForm(mountId));
+}
+
+async function openCommissionForm(id, from) {
+  await loadCommissionCatalog();
+  state.commissionFormReturn = from || 'comissoes';
+  if (id) {
+    const { commission } = await Api.get(`/commissions/${id}`);
+    state.commissionDraft = CommissionUI.draftFrom(commission);
+  } else {
+    state.commissionDraft = CommissionUI.emptyDraft();
+  }
+  const editing = !!state.commissionDraft.id;
+  if (from === 'onboarding') {
+    $('obFormTitle').textContent = editing ? 'Editar comissão' : 'Nova comissão';
+    renderCommissionForm('obCfMount');
+    showWizard('wizardCommissionForm');
+    return;
+  }
+  $('cfPageTitle').textContent = editing ? 'Editar comissão' : 'Nova comissão';
+  $('btnDeleteCommission').classList.toggle('hidden', !editing);
+  if ($('cfError')) {
+    $('cfError').classList.add('hidden');
+    $('cfError').textContent = '';
+  }
+  $('btnSaveCommission').disabled = false;
+  $('btnSaveCommission').textContent = 'Salvar comissão';
+  renderCommissionForm('cfMount');
+  await goTo('comissao-form');
+}
+
+async function saveCommissionFrom(mountId) {
+  if (!state.commissionDraft) {
+    throw new Error('Abra o formulário novamente para salvar.');
+  }
+  const root = $(mountId);
+  if (!root) throw new Error('Formulário não encontrado.');
+  CommissionUI.syncDraftFromDom(root, state.commissionDraft);
+  const payload = CommissionUI.payloadFromDraft(state.commissionDraft);
+  if (!payload.name) throw new Error('Informe o nome da comissão.');
+  if (state.commissionDraft.id) {
+    await Api.patch(`/commissions/${state.commissionDraft.id}`, payload);
+  } else {
+    await Api.post('/commissions', payload);
+  }
+}
+
+function showFormError(boxId, msg) {
+  const box = $(boxId);
+  if (!box) {
+    alert(msg);
+    return;
+  }
+  box.textContent = msg;
+  box.classList.remove('hidden');
+  box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+async function handleSaveCommission(btn, mountId, errorBoxId, afterSave) {
+  const box = $(errorBoxId);
+  if (box) {
+    box.classList.add('hidden');
+    box.textContent = '';
+  }
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Salvando…';
+  try {
+    await saveCommissionFrom(mountId);
+    btn.textContent = 'Salva';
+    await afterSave();
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = original;
+    showFormError(errorBoxId, err.message || 'Não foi possível salvar a comissão.');
+  }
+}
+
+async function renderOnboardingCommissionList() {
+  await refreshCommissions();
+  $('obCommissionList').innerHTML = CommissionUI.listHtml(state.commissions);
+  $('btnObCommissionsNext').disabled = state.commissions.length === 0;
+  $('obCommissionList').querySelectorAll('[data-edit-commission]').forEach((btn) => {
+    btn.onclick = () => openCommissionForm(btn.dataset.editCommission, 'onboarding');
+  });
 }
 
 /* ---------- Stores ---------- */
 async function refreshStores() {
-  const { stores } = await Api.get('/stores');
-  state.stores = stores;
+  try {
+    const { stores } = await Api.get('/stores');
+    state.stores = stores || [];
+  } catch {
+    state.stores = [];
+  }
   const sel = $('storeFilter');
-  const cur = state.selectedStoreId;
-  sel.innerHTML = `<option value="">Todas as lojas</option>` +
-    stores.map((s) => `<option value="${s.id}">${s.name}</option>`).join('');
-  sel.value = cur;
-  const sim = $('simStore');
-  if (sim) {
-    sim.innerHTML = stores.map((s) => `<option value="${s.id}">${s.name}</option>`).join('');
+  if (sel) {
+    const cur = state.selectedStoreId;
+    sel.innerHTML =
+      `<option value="">Todas</option>` +
+      state.stores.map((s) => `<option value="${s.id}">${s.name}</option>`).join('');
+    sel.value = cur;
   }
 }
 
 async function loadStoresScreen() {
   await refreshStores();
   const list = $('storesList');
+  if (!list) return;
   if (!state.stores.length) {
     list.innerHTML = '<p class="empty">Nenhuma loja cadastrada.</p>';
     return;
@@ -329,45 +612,374 @@ function openStoreModal() {
 
 /* ---------- Dashboard ---------- */
 async function loadDashboard() {
-  const q = state.selectedStoreId ? `?storeId=${state.selectedStoreId}` : '';
-  const data = await Api.get(`/dashboard${q}`);
+  const scope = state.user?.canSeeTeam ? state.dashScope || 'workspace' : 'me';
+  const data = await Api.get(`/dashboard?scope=${scope}`);
   const k = data.kpis;
+  const monthLabel = new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  $('dashHello').textContent = `Olá, ${firstName()}! ${data.scope === 'workspace' ? 'Visão do espaço.' : 'Toque numa comissão para lançar.'}`;
+  $('dashMonthLabel').textContent = `Comissão · ${monthLabel}`;
   $('kpiCommission').textContent = fmt(k.commissionMonth);
   $('kpiReceived').textContent = fmt(k.commissionReceived);
   $('kpiPipeline').textContent = fmt(k.pipeline);
-  $('kpiRevenue').textContent = fmt(k.revenueMonth);
-  $('kpiSalesCount').textContent = `${k.salesCount} vendas neste ciclo`;
+  $('kpiSalesCount').textContent = `${k.salesCount} lançamento${k.salesCount === 1 ? '' : 's'} neste mês`;
+  const today = (data.byCommission || []).reduce((s, c) => s + (Number(c.todayCommission) || 0), 0);
+  if ($('kpiToday')) $('kpiToday').textContent = fmt(today);
+  renderReceiveConfirm(data.dueToConfirm || [], data.dueTotal || 0);
 
-  $('byStoreCards').innerHTML = (data.byStore || []).map((s) => `
-    <div class="mini-card">
-      <div class="mini-top"><div class="mini-val"><div class="n">${fmt(s.commission)}</div><div class="s">${s.name}</div></div></div>
-      <div class="mini-bottom"><span style="font-size:12px;color:var(--text-dim)">${s.salesCount} vendas</span>
-      <span class="mini-delta up">${s.color ? '' : ''}${fmt(s.commission)}</span></div>
-    </div>`).join('') || '<p class="empty">Sem dados</p>';
-
-  state.series = data.series || [];
-  drawSeriesChart('mainChart', 'chartAxis', state.series, state.chartMode);
-
-  if (data.ladder) {
-    $('ladderStore').textContent = data.ladder.storeName;
-    $('ladderUnits').textContent = `${data.ladder.units} no mês`;
-    $('ladderBadge').textContent = data.ladder.progress
-      ? `Faixa ${((data.ladder.progress.currentPercent || 0) * 100).toFixed(2).replace('.', ',')}%`
-      : '—';
-    $('ladderNote').textContent = data.ladder.progress?.message || '';
-    renderLadder('ladderSteps', 'ladderLabels', data.ladder.bands || [], data.ladder.units);
-  } else {
-    $('ladderStore').textContent = 'Sem faixas nesta loja';
-    $('ladderUnits').textContent = 'Use modelo de faixas para ver a escada';
-    $('ladderSteps').innerHTML = '';
-    $('ladderNote').textContent = '';
+  const tabs = $('dashScopeTabs');
+  if (tabs) {
+    tabs.classList.toggle('hidden', !data.canSeeTeam);
+    tabs.querySelectorAll('[data-scope]').forEach((b) => {
+      b.classList.toggle('on', b.dataset.scope === scope);
+      b.classList.toggle('active', b.dataset.scope === scope);
+      b.onclick = () => {
+        state.dashScope = b.dataset.scope;
+        loadDashboard();
+      };
+    });
   }
 
-  $('recentSales').innerHTML = (data.recent || []).map((s) => `
-    <div class="tx-row">
-      <div class="tx-main"><div class="t">${s.title}</div><div class="s">${s.storeName} · ${s.saleDate}</div></div>
-      <div class="tx-amt ${s.status === 'cancelada' ? 'neg' : 'pos'}">${s.status === 'cancelada' ? '—' : '+' + fmt(s.commissionTotal)}</div>
-    </div>`).join('') || '<p class="empty">Nenhuma venda</p>';
+  const goalBox = $('dashGoalBox');
+  if (goalBox) {
+    if (data.goal) {
+      goalBox.classList.remove('hidden');
+      const pct = Math.min(100, data.goal.percent || 0);
+      const unit = data.goal.metric === 'quantity' ? `${Math.round(data.goal.current)} / ${Math.round(data.goal.target)}` : `${fmt(data.goal.current)} / ${fmt(data.goal.target)}`;
+      goalBox.innerHTML = `<div class="goal-meta"><span>Meta do ${data.goal.metric === 'quantity' ? 'mês (qtd)' : 'mês'}</span><strong>${Math.round(data.goal.percent)}%</strong></div>
+        <div class="goal-track"><span style="width:${pct}%"></span></div>
+        <div class="goal-sub">${unit} · faltam ${data.goal.metric === 'quantity' ? data.goal.remaining : fmt(data.goal.remaining)}</div>`;
+    } else {
+      goalBox.classList.add('hidden');
+      goalBox.innerHTML = '';
+    }
+  }
+
+  const rankWrap = $('dashRankingWrap');
+  if (rankWrap) {
+    const show = data.scope === 'workspace' && (data.ranking || []).length;
+    rankWrap.classList.toggle('hidden', !show);
+    if (show) {
+      $('dashRanking').innerHTML = data.ranking
+        .map(
+          (r, i) => `<button class="sale-row" type="button" data-seller="${r.sellerId}">
+            <span class="sale-dot pendente"></span>
+            <div class="sale-main"><div class="title">${i + 1}. ${r.name}</div>
+            <div class="sub">${r.launches} lançamento${r.launches === 1 ? '' : 's'}</div></div>
+            <div class="sale-amt"><div class="v mono">${fmt(r.commission)}</div></div>
+          </button>`
+        )
+        .join('');
+      $('dashRanking').querySelectorAll('[data-seller]').forEach((btn) => {
+        btn.onclick = () => {
+          state.dashScope = 'me';
+          state.previewSellerId = btn.dataset.seller;
+          loadDashboard();
+        };
+      });
+    }
+  }
+  const alerts = $('dashAlerts');
+  if (alerts) {
+    alerts.innerHTML = (data.alerts || [])
+      .map((a) => `<p class="screen-lead">${a.name} ainda não lançou neste mês.</p>`)
+      .join('');
+    try {
+      const pend = await Api.get('/inbox/followups');
+      const extra = (pend.followups || []).filter((f) => f.type !== 'receivable_due').length;
+      if (extra) {
+        alerts.insertAdjacentHTML(
+          'afterbegin',
+          `<p class="screen-lead"><button class="link" type="button" data-go-pend>Você tem ${extra} pendência${extra === 1 ? '' : 's'} além dos recebimentos.</button></p>`
+        );
+        alerts.querySelector('[data-go-pend]')?.addEventListener('click', () => goTo('pendencias'));
+      }
+    } catch (_) { /* ignore */ }
+  }
+
+  const list = $('dashCommissionList');
+  const types = data.byCommission || [];
+  const canLaunch = data.canLaunch !== false && state.user?.canLaunch !== false;
+  if (!types.length) {
+    list.innerHTML = `<p class="empty">Cadastre uma comissão para começar a lançar.<br><button class="link" type="button" id="dashGoCommissions">Ir para minhas comissões</button></p>`;
+    const go = $('dashGoCommissions');
+    if (go) go.onclick = () => goTo('comissoes');
+  } else {
+    list.innerHTML = types
+      .map(
+        (c) => `
+      <div class="launch-card">
+        <button class="comm-card-body" type="button" data-history="${c.id}">
+          <h3>${c.name}</h3>
+          <p class="comm-detail">${c.detail || ''} · ${c.highlight || ''}</p>
+          <div class="comm-highlight">${fmt(c.monthCommission)} este mês</div>
+          <p class="comm-receive">${c.monthCount || 0} lançamento${c.monthCount === 1 ? '' : 's'} · recebe ${(c.receiveLabel || '').toLowerCase()}</p>
+        </button>
+        ${canLaunch ? `<button class="launch-cta" type="button" data-launch="${c.id}">Lançar</button>` : ''}
+      </div>`
+      )
+      .join('');
+    list.querySelectorAll('[data-history]').forEach((btn) => {
+      btn.onclick = () => openCommissionHistory(btn.dataset.history, types);
+    });
+    list.querySelectorAll('[data-launch]').forEach((btn) => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        openLaunch(btn.dataset.launch, types);
+      };
+    });
+  }
+
+  $('recentSales').innerHTML = (data.recent || []).length
+    ? data.recent
+        .map(
+          (s) => `
+      <div class="tx-row">
+        <div class="tx-main"><div class="t">${s.title}</div>
+        <div class="s">${s.sellerName ? s.sellerName + ' · ' : ''}${s.commissionName || s.storeName || '—'} · ${s.saleDate}</div></div>
+        <div class="tx-amt ${s.status === 'cancelada' ? 'neg' : 'pos'}">${s.status === 'cancelada' ? '—' : '+' + fmt(s.commissionTotal)}</div>
+      </div>`
+        )
+        .join('')
+    : '<p class="empty">Nenhum lançamento ainda</p>';
+}
+
+function fmtDay(isoDate) {
+  if (!isoDate) return '—';
+  const [y, m, d] = String(isoDate).slice(0, 10).split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function renderReceiveConfirm(items, total) {
+  const box = $('receiveConfirmBanner');
+  if (!box) return;
+  if (!items.length) {
+    box.classList.add('hidden');
+    box.innerHTML = '';
+    return;
+  }
+  const extra = items.length > 4 ? `<li>e mais ${items.length - 4}…</li>` : '';
+  const rows = items
+    .slice(0, 4)
+    .map(
+      (r) =>
+        `<li>${r.saleTitle || r.label} · ${fmtDay(r.dueDate)} · ${fmt(r.amount)}</li>`
+    )
+    .join('');
+  box.classList.remove('hidden');
+  box.innerHTML = `
+    <h4>Confirme o que deveria ter entrado</h4>
+    <p>${items.length} recebimento${items.length === 1 ? '' : 's'} no total de <strong>${fmt(total)}</strong> com vencimento até hoje. Confira se caiu na conta.</p>
+    <ul>${rows}${extra}</ul>
+    <div class="row-actions">
+      <button type="button" class="btn-confirm" id="btnConfirmAllDue">Confirmar todos</button>
+    </div>`;
+  const all = $('btnConfirmAllDue');
+  if (all) {
+    all.onclick = async () => {
+      all.disabled = true;
+      all.textContent = 'Confirmando…';
+      try {
+        await Api.post('/dashboard/receivables/confirm-due', { ids: items.map((r) => r.id) });
+        await loadDashboard();
+      } catch (e) {
+        all.disabled = false;
+        all.textContent = 'Confirmar todos';
+        alert(e.message || 'Não foi possível confirmar.');
+      }
+    };
+  }
+}
+
+async function openCommissionHistory(commissionId, types) {
+  const list = types || state.commissions || [];
+  const type = list.find((c) => c.id === commissionId);
+  if (!type) return;
+  state.launchCommission = type;
+  $('historyTitle').textContent = type.name;
+  $('historySub').textContent = `${type.detail || ''} · ${type.monthCount || 0} lançamento${type.monthCount === 1 ? '' : 's'} neste mês`;
+  $('historyList').innerHTML = '<p class="empty">Carregando…</p>';
+  show($('historyOverlay'));
+  try {
+    const { sales } = await Api.get(`/sales?commissionTypeId=${encodeURIComponent(type.id)}`);
+    $('historyList').innerHTML = sales.length
+      ? sales
+          .map(
+            (s) => `
+      <button class="sale-row" type="button" data-id="${s.id}">
+        <span class="sale-dot ${s.status}"></span>
+        <div class="sale-main"><div class="title">${s.title}</div>
+        <div class="sub">${s.saleDate} · ${s.status}</div></div>
+        <div class="sale-amt"><div class="v mono">${fmt(s.grossValue)}</div>
+        <div class="c mono">${s.status === 'cancelada' ? '—' : '+' + fmt(s.commissionTotal)}</div></div>
+      </button>`
+          )
+          .join('')
+      : '<p class="empty">Nenhum lançamento nesta comissão ainda.</p>';
+    $('historyList').querySelectorAll('.sale-row').forEach((btn) => {
+      btn.onclick = () => {
+        hide($('historyOverlay'));
+        openSaleDetail(btn.dataset.id);
+      };
+    });
+  } catch (e) {
+    $('historyList').innerHTML = `<p class="empty">${e.message || 'Não foi possível carregar.'}</p>`;
+  }
+  const launchBtn = $('btnHistoryLaunch');
+  if (launchBtn) {
+    launchBtn.onclick = () => {
+      hide($('historyOverlay'));
+      openLaunch(type.id, list);
+    };
+  }
+}
+
+function launchInputs() {
+  const type = state.launchCommission;
+  if (!type) return {};
+  return {
+    grossValue: Number($('launchValue')?.value) || 0,
+    quantity: Number($('launchQty')?.value) || 1,
+    costValue: Number($('launchCost')?.value) || 0,
+    receiveDate: $('launchReceive')?.value || '',
+    clientName: $('launchClient')?.value?.trim() || '',
+    phone: $('launchPhone')?.value?.trim() || '',
+    email: $('launchEmail')?.value?.trim() || '',
+    notes: $('launchNotes')?.value?.trim() || '',
+    monthCount: type.monthCount || 0,
+    monthRevenue: type.monthRevenue || 0,
+    commissionAmount: $('launchCommission') ? Number($('launchCommission').value) : undefined,
+    flexPercent: $('launchFlex') ? Number($('launchFlex').value) || 0 : 0,
+  };
+}
+
+function renderLaunchPreview() {
+  const type = state.launchCommission;
+  const box = $('launchPreview');
+  if (!type || !box) return;
+  const p = CommissionUI.preview(type, launchInputs());
+  const receive = type.receiveLabel ? ` · recebe ${type.receiveLabel.toLowerCase()}` : '';
+  const extra =
+    p.monthRecalc && p.previousCount && p.monthRate != null
+      ? `<div class="note extra">Os ${p.previousCount} lançamento${p.previousCount === 1 ? '' : 's'} anterior${p.previousCount === 1 ? '' : 'es'} deste mês também passam para ${String(p.monthRate).replace('.', ',')}%.</div>`
+      : '';
+  box.innerHTML = `<div class="lbl">Sua comissão</div>
+    <div class="num">${fmt(p.amount)}</div>
+    <div class="note">${p.note || ''}${receive}</div>${extra}`;
+}
+
+function openLaunch(commissionId, types) {
+  const list = types || state.commissions || [];
+  const type = list.find((c) => c.id === commissionId);
+  if (!type) {
+    alert('Comissão não encontrada. Cadastre suas regras em Minhas Comissões.');
+    return goTo('comissoes');
+  }
+  state.launchCommission = type;
+  $('launchTitle').textContent = `Lançar · ${type.name}`;
+  $('launchRule').textContent = `${type.detail} · ${type.highlight}`;
+  if ($('launchError')) {
+    $('launchError').classList.add('hidden');
+    $('launchError').textContent = '';
+  }
+  const needsQty = type.calcType === 'quantity' || type.config?.per === 'unit';
+  const needsCost = type.config?.appliedOn === 'margin' || type.config?.appliedOn === 'net_value';
+  const needsReceive = type.receiveWhen === 'per_entry';
+  const isPrize = type.calcType === 'prize';
+  const isFlex = type.calcType === 'flex';
+  const itemLabel = isPrize ? type.config?.itemLabel || 'Valor do item' : 'Valor';
+  $('saleForm').innerHTML = `
+    <div class="field"><label>${itemLabel} <span class="req">obrigatório</span></label>
+      <input id="launchValue" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0" required></div>
+    ${isPrize ? `<div class="field"><label>Valor da premiação <span class="req">obrigatório</span></label>
+      <input id="launchCommission" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0" required></div>` : ''}
+    ${isFlex ? `<div class="field"><label>Flexibilização</label>
+      <div class="suffix-input"><input id="launchFlex" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0" value="0"><span>%</span></div>
+      <p class="field-hint">% desta venda que você flexibilizou. 0 = sem flex. Até 3% = comissão de 0,5%.</p></div>` : ''}
+    <div class="field"><label>Nome do cliente <span class="opt">(opcional)</span></label>
+      <input id="launchClient" type="text" placeholder="Nome" autocomplete="name"></div>
+    <div class="field"><label>Número <span class="opt">(opcional)</span></label>
+      <input id="launchPhone" type="tel" placeholder="WhatsApp ou telefone" inputmode="tel" autocomplete="tel"></div>
+    <div class="field"><label>E-mail <span class="opt">(opcional)</span></label>
+      <input id="launchEmail" type="email" placeholder="email@exemplo.com" autocomplete="email"></div>
+    <div class="field"><label>Observações <span class="opt">(opcional)</span></label>
+      <textarea id="launchNotes" rows="3" placeholder="Detalhes da venda, veículo, pedido…"></textarea></div>
+    ${needsQty ? `<div class="field"><label>Quantidade</label>
+      <input id="launchQty" type="number" min="1" step="1" value="1"></div>` : ''}
+    ${needsCost ? `<div class="field"><label>Custo</label>
+      <input id="launchCost" type="number" min="0" step="0.01" value="0"></div>` : ''}
+    ${needsReceive ? `<div class="field"><label>Quando você recebe?</label>
+      <input id="launchReceive" type="date"></div>` : ''}
+  `;
+  ['launchValue', 'launchQty', 'launchCost', 'launchCommission', 'launchFlex'].forEach((id) => {
+    const el = $(id);
+    if (el) el.addEventListener('input', renderLaunchPreview);
+  });
+  renderLaunchPreview();
+  const val = $('launchValue');
+  show($('saleOverlay'));
+  if (val) setTimeout(() => val.focus(), 80);
+}
+
+async function saveSale() {
+  const type = state.launchCommission;
+  if (!type) return;
+  const err = $('launchError');
+  if (err) {
+    err.classList.add('hidden');
+    err.textContent = '';
+  }
+  const input = launchInputs();
+  if (type.calcType === 'prize') {
+    if ($('launchValue')?.value === '') {
+      if (err) {
+        err.textContent = 'Informe o valor do item.';
+        err.classList.remove('hidden');
+      }
+      return;
+    }
+    if ($('launchCommission')?.value === '') {
+      if (err) {
+        err.textContent = 'Informe o valor da premiação.';
+        err.classList.remove('hidden');
+      }
+      return;
+    }
+  } else if (type.calcType !== 'fixed' && type.calcType !== 'quantity' && !input.grossValue) {
+    if (err) {
+      err.textContent = 'Informe o valor do lançamento.';
+      err.classList.remove('hidden');
+    }
+    return;
+  }
+  const btn = $('btnSaveSale');
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Lançando…';
+  try {
+    await Api.post('/sales', {
+      commissionTypeId: type.id,
+      grossValue: input.grossValue,
+      quantity: input.quantity,
+      costValue: input.costValue,
+      commissionAmount: type.calcType === 'prize' ? input.commissionAmount : undefined,
+      flexPercent: type.calcType === 'flex' ? input.flexPercent : undefined,
+      clientName: input.clientName,
+      phone: input.phone,
+      email: input.email,
+      notes: input.notes,
+      receiveDate: input.receiveDate || undefined,
+    });
+    hide($('saleOverlay'));
+    await goTo('dashboard');
+  } catch (e) {
+    if (err) {
+      err.textContent = e.message || 'Não foi possível lançar.';
+      err.classList.remove('hidden');
+    } else alert(e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
 }
 
 function drawSeriesChart(svgId, axisId, series, mode) {
@@ -424,7 +1036,7 @@ async function loadSales() {
       <button class="sale-row" type="button" data-id="${s.id}">
         <span class="sale-dot ${s.status}"></span>
         <div class="sale-main"><div class="title">${s.title}</div>
-        <div class="sub">${s.storeName} · ${s.clientName || '—'} · ${s.saleDate}</div></div>
+        <div class="sub">${s.commissionName || s.storeName || '—'} · ${s.saleDate}</div></div>
         <div class="sale-amt"><div class="v mono">${fmt(s.grossValue)}</div>
         <div class="c mono">${s.status === 'cancelada' ? '—' : '+' + fmt(s.commissionTotal)}</div></div>
       </button>`).join('')
@@ -438,9 +1050,13 @@ async function openSaleDetail(id) {
   const { sale, receivables } = await Api.get(`/sales/${id}`);
   state.currentSaleId = id;
   $('detailTitle').textContent = sale.title;
-  $('detailSnap').innerHTML = `Snapshot histórico: regra vigente em <strong>${sale.saleDate}</strong> — ${sale.snapshot?.bandLabel || '—'} (${sale.snapshot?.engineNote || ''}). Alterações futuras não recalculam esta venda.`;
+  const snap = sale.snapshot || {};
+  const snapNote = snap.monthRecalc
+    ? `Faixa do mês: <strong>${snap.bandLabel || '—'}</strong> — ${snap.engineNote || 'o % atual vale para todos os lançamentos do período'}.`
+    : `Snapshot histórico: regra vigente em <strong>${sale.saleDate}</strong> — ${snap.bandLabel || '—'} (${snap.engineNote || ''}).`;
+  $('detailSnap').innerHTML = snapNote;
   $('detailBody').innerHTML = `
-    <div class="kv"><span>Loja</span><span>${sale.storeName || '—'}</span></div>
+    <div class="kv"><span>Comissão</span><span>${sale.commissionName || sale.snapshot?.commissionName || '—'}</span></div>
     <div class="kv"><span>Cliente</span><span>${sale.clientName || '—'}</span></div>
     <div class="kv"><span>Valor</span><span>${fmt(sale.grossValue)}</span></div>
     <div class="kv"><span>Faixa / regra</span><span>${sale.snapshot?.bandLabel || '—'}</span></div>
@@ -451,80 +1067,6 @@ async function openSaleDetail(id) {
     ${(receivables || []).map((r) => `<div class="kv"><span>${r.label} (${r.kind}) · ${r.dueDate}</span><span>${fmt(r.amount)} · ${r.status}</span></div>`).join('') || '<p class="empty">—</p>'}`;
   $('detailStatus').value = sale.status;
   show($('detailOverlay'));
-}
-
-function openSaleModal() {
-  if (!state.stores.length) {
-    alert('Cadastre uma loja primeiro.');
-    return goTo('lojas');
-  }
-  const niche = state.user?.niche || 'personalizado';
-  const fields = state.nicheFields[niche] || state.nicheFields.personalizado || [];
-  const dynamic = fields.map((f) => {
-    if (f.type === 'select') {
-      return `<div class="form-field full"><label>${f.label}</label><select data-niche="${f.key}">${(f.options || []).map((o) => `<option>${o}</option>`).join('')}</select></div>`;
-    }
-    if (f.type === 'toggle') {
-      return `<div class="form-field full toggle-field" style="margin:0"><span>${f.label}</span><button class="switch" type="button" data-niche-toggle="${f.key}"></button></div>`;
-    }
-    return `<div class="form-field full"><label>${f.label}</label><input data-niche="${f.key}" type="${f.type === 'money' ? 'number' : 'text'}" placeholder="${f.type === 'money' ? '0' : ''}"></div>`;
-  }).join('');
-
-  $('saleForm').innerHTML = `
-    <div class="form-field full"><label>Loja</label>
-      <select id="saleStore">${state.stores.map((s) => `<option value="${s.id}">${s.name}</option>`).join('')}</select></div>
-    <div class="form-field full"><label>Cliente</label><input id="saleClient"></div>
-    <div class="form-field"><label>Data</label><input id="saleDate" type="date" value="${new Date().toISOString().slice(0, 10)}"></div>
-    <div class="form-field"><label>Valor</label><input id="saleValue" type="number" placeholder="0"></div>
-    <div class="form-field"><label>Acessórios</label><input id="saleAcc" type="number" value="0"></div>
-    <div class="form-field"><label>Por fora (R$)</label><input id="saleExtra" type="number" value="0"></div>
-    ${dynamic}
-    <div class="form-field full"><label>Marcos / parcelas (JSON opcional)</label>
-      <textarea id="saleMilestones" placeholder='[{"label":"Sinal","percent":0.5,"kind":"oficial"},{"label":"Restante","percent":0.5}]'></textarea></div>
-    <div class="toggle-field" style="margin:0;grid-column:1/-1"><span>Dividir com parceiro (split)</span><button class="switch" id="saleSplit" type="button"></button></div>
-    <div class="form-field"><label>Parceiro</label><input id="salePartner"></div>
-    <div class="form-field"><label>% parceiro</label><input id="saleSplitPct" type="number" value="50"></div>`;
-  $('saleForm').querySelectorAll('.switch').forEach((sw) => {
-    sw.onclick = () => sw.classList.toggle('on');
-  });
-  show($('saleOverlay'));
-}
-
-async function saveSale() {
-  const nicheFields = {};
-  $('saleForm').querySelectorAll('[data-niche]').forEach((el) => {
-    nicheFields[el.dataset.niche] = el.type === 'number' ? Number(el.value) : el.value;
-  });
-  $('saleForm').querySelectorAll('[data-niche-toggle]').forEach((el) => {
-    nicheFields[el.dataset.nicheToggle] = el.classList.contains('on');
-  });
-  let milestones;
-  try {
-    const raw = $('saleMilestones').value.trim();
-    if (raw) milestones = JSON.parse(raw);
-  } catch {
-    return alert('JSON de marcos inválido');
-  }
-  const body = {
-    storeId: $('saleStore').value,
-    clientName: $('saleClient').value,
-    saleDate: $('saleDate').value,
-    grossValue: Number($('saleValue').value) || 0,
-    accessoriesValue: Number($('saleAcc').value) || 0,
-    commissionExtra: Number($('saleExtra').value) || 0,
-    nicheFields,
-    splitEnabled: $('saleSplit').classList.contains('on'),
-    splitPartner: $('salePartner').value,
-    splitPercent: Number($('saleSplitPct').value) || 0,
-    milestones,
-  };
-  try {
-    await Api.post('/sales', body);
-    hide($('saleOverlay'));
-    await goTo('vendas');
-  } catch (err) {
-    alert(err.message);
-  }
 }
 
 /* ---------- Leads / Receivables ---------- */
@@ -549,8 +1091,6 @@ function openLeadModal() {
     <div class="form-field full"><label>Cliente</label><input id="leadClient"></div>
     <div class="form-field"><label>Valor</label><input id="leadValue" type="number"></div>
     <div class="form-field"><label>Probabilidade %</label><input id="leadProb" type="number" value="50"></div>
-    <div class="form-field full"><label>Loja</label>
-      <select id="leadStore"><option value="">—</option>${state.stores.map((s) => `<option value="${s.id}">${s.name}</option>`).join('')}</select></div>
     <div class="form-field full"><label>Estágio</label>
       <select id="leadStage"><option>lead</option><option>proposta</option><option>negociacao</option><option>fechado</option><option>perdido</option></select></div>`;
   show($('leadOverlay'));
@@ -558,16 +1098,45 @@ function openLeadModal() {
 
 async function loadReceivables() {
   const { receivables } = await Api.get('/dashboard/receivables');
-  $('receivablesList').innerHTML = receivables.length
-    ? receivables.map((r) => `
-      <div class="sale-row" style="cursor:default">
+  const today = new Date().toISOString().slice(0, 10);
+  const due = receivables.filter((r) => r.status !== 'quitado' && r.status !== 'cancelado' && r.dueDate <= today);
+  const rest = receivables.filter((r) => !due.includes(r));
+  const ordered = [...due, ...rest];
+  const head = due.length
+    ? `<div class="receive-banner" style="margin-bottom:14px"><h4>Confirme o que deveria ter entrado</h4>
+        <p>${due.length} item${due.length === 1 ? '' : 's'} com vencimento até hoje. Toque em confirmar em cada um, ou todos de uma vez.</p>
+        <div class="row-actions"><button type="button" class="btn-confirm" id="btnConfirmDueList">Confirmar vencidos (${due.length})</button></div></div>`
+    : '';
+  $('receivablesList').innerHTML =
+    head +
+    (ordered.length
+      ? ordered
+          .map((r) => {
+            const overdue = r.status !== 'quitado' && r.status !== 'cancelado' && r.dueDate <= today;
+            return `
+      <div class="sale-row" style="cursor:default${overdue ? ';border-color:rgba(232,163,61,.45)' : ''}">
         <span class="sale-dot ${r.status === 'quitado' ? 'quitada' : 'pendente'}"></span>
         <div class="sale-main"><div class="title">${r.saleTitle} — ${r.label}</div>
-        <div class="sub">${r.storeName} · venc. ${r.dueDate} · ${r.kind}</div></div>
+        <div class="sub">${r.storeName} · venc. ${fmtDay(r.dueDate)} · ${r.kind}${overdue ? ' · confirmar' : ''}</div></div>
         <div class="sale-amt"><div class="v">${fmt(r.amount)}</div>
-        <button class="chip ${r.status === 'quitado' ? 'active' : ''}" data-rid="${r.id}" style="margin-top:6px">${r.status}</button></div>
-      </div>`).join('')
-    : '<p class="empty">Sem recebíveis</p>';
+        <button class="chip ${r.status === 'quitado' ? 'active' : ''}" data-rid="${r.id}" style="margin-top:6px">${r.status === 'quitado' ? 'quitado' : 'Confirmar'}</button></div>
+      </div>`;
+          })
+          .join('')
+      : '<p class="empty">Sem recebíveis</p>');
+  const bulk = $('btnConfirmDueList');
+  if (bulk) {
+    bulk.onclick = async () => {
+      bulk.disabled = true;
+      try {
+        await Api.post('/dashboard/receivables/confirm-due', { ids: due.map((r) => r.id) });
+        await loadReceivables();
+      } catch (e) {
+        bulk.disabled = false;
+        alert(e.message || 'Não foi possível confirmar.');
+      }
+    };
+  }
   $('receivablesList').querySelectorAll('[data-rid]').forEach((btn) => {
     btn.onclick = async () => {
       if (btn.textContent === 'quitado') return;
@@ -579,23 +1148,82 @@ async function loadReceivables() {
 
 /* ---------- Tools ---------- */
 async function loadSimulator() {
-  await refreshStores();
-  await runSim();
+  const { commissions } = await Api.get('/commissions');
+  state.commissions = commissions || [];
+  let dash = { byCommission: [] };
+  try {
+    dash = await Api.get('/dashboard');
+  } catch {
+    /* preview still works without month counts */
+  }
+  const counts = {};
+  (dash.byCommission || []).forEach((c) => {
+    counts[c.id] = { monthCount: c.monthCount || 0, monthRevenue: c.monthRevenue || 0 };
+  });
+  state.simCounts = counts;
+  const sel = $('simCommission');
+  if (!sel) return;
+  if (!state.commissions.length) {
+    sel.innerHTML = '<option value="">Cadastre uma comissão</option>';
+    $('simResult').textContent = fmt(0);
+    if ($('simNote')) $('simNote').textContent = 'Cadastre uma comissão em Minhas Comissões.';
+    return;
+  }
+  sel.innerHTML = state.commissions.map((c) => `<option value="${c.id}">${c.name}</option>`).join('');
+  sel.onchange = () => {
+    syncSimFields();
+    runSim();
+  };
+  ['simValue', 'simFlex', 'simQty', 'simPrize', 'simCost'].forEach((id) => {
+    const n = $(id);
+    if (n) n.oninput = runSim;
+  });
+  syncSimFields();
+  runSim();
 }
 
-async function runSim() {
-  const storeId = $('simStore').value || state.stores[0]?.id;
-  const extraUnits = Number($('simUnits').value);
-  const ticket = Number($('simTicket').value);
-  $('simUnitsVal').textContent = `${extraUnits} un.`;
-  $('simTicketVal').textContent = fmt(ticket);
-  if (!storeId) return;
-  const { result, currentUnits, rule } = await Api.post('/tools/simulate', { storeId, extraUnits, ticket });
-  $('simResult').textContent = fmt(result.projectedCommission);
-  $('simDiff').textContent = `↑ ${fmt(result.diff)} vs. cenário atual`;
-  $('simProjLabel').textContent = `${result.projectedUnits} unidades projetadas (hoje: ${currentUnits})`;
-  $('simBadge').textContent = result.bandLabel;
-  renderLadder('ladderStepsSim', 'ladderLabelsSim', rule.bands || [], result.projectedUnits);
+function currentSimType() {
+  const id = $('simCommission')?.value;
+  const type = (state.commissions || []).find((c) => c.id === id);
+  if (!type) return null;
+  const extra = (state.simCounts || {})[type.id] || {};
+  return { ...type, monthCount: extra.monthCount || 0, monthRevenue: extra.monthRevenue || 0 };
+}
+
+function syncSimFields() {
+  const type = currentSimType();
+  if (!type) return;
+  const flex = type.calcType === 'flex';
+  const qty = type.calcType === 'quantity' || type.config?.per === 'unit';
+  const prize = type.calcType === 'prize';
+  const cost = type.config?.appliedOn === 'margin' || type.config?.appliedOn === 'net_value';
+  $('simFlexWrap')?.classList.toggle('hidden', !flex);
+  $('simQtyWrap')?.classList.toggle('hidden', !qty);
+  $('simPrizeWrap')?.classList.toggle('hidden', !prize);
+  $('simCostWrap')?.classList.toggle('hidden', !cost);
+  $('simValueWrap')?.classList.toggle('hidden', prize && false);
+}
+
+function runSim() {
+  const type = currentSimType();
+  if (!type || !window.CommissionUI) {
+    if ($('simResult')) $('simResult').textContent = fmt(0);
+    return;
+  }
+  const p = CommissionUI.preview(type, {
+    grossValue: Number($('simValue')?.value) || 0,
+    quantity: Number($('simQty')?.value) || 1,
+    costValue: Number($('simCost')?.value) || 0,
+    flexPercent: Number($('simFlex')?.value) || 0,
+    commissionAmount: Number($('simPrize')?.value) || 0,
+    monthCount: type.monthCount || 0,
+    monthRevenue: type.monthRevenue || 0,
+  });
+  $('simResult').textContent = fmt(p.amount);
+  if ($('simNote')) {
+    const month = type.monthCount ? ` · ${type.monthCount} no mês` : '';
+    $('simNote').textContent = `${p.note || type.highlight || ''}${month}`;
+  }
 }
 
 async function runRecon() {
@@ -633,15 +1261,141 @@ async function loadSmoothing() {
 }
 
 async function loadTeam() {
-  const { members } = await Api.get('/team/members');
+  const { members, limits } = await Api.get('/team/members');
+  if ($('teamLimits')) {
+    $('teamLimits').textContent = limits
+      ? `${limits.used} de ${limits.cap} pessoas (incluso ${limits.included}${limits.extraSeats ? ` + ${limits.extraSeats} extra` : ''})`
+      : '';
+  }
   $('teamList').innerHTML = members.length
     ? members.map((m) => `
       <div class="store-card" style="cursor:default">
         <div class="avatar">${initials(m.name || m.email)}</div>
-        <div class="store-info"><div class="name">${m.name || m.email}</div><div class="meta">${m.email}</div></div>
-        <div class="store-figure"><div class="amt">${m.role}</div><span class="stat ${m.status === 'accepted' ? 'quitado' : 'pendente'}">${m.status}</span></div>
+        <div class="store-info"><div class="name">${m.name || m.email}</div>
+        <div class="meta">${m.email}${m.inviteLink ? ' · convite pendente' : ''}</div></div>
+        <div class="store-figure"><div class="amt">${m.roleLabel || m.role}</div>
+        <span class="stat ${m.status === 'accepted' ? 'quitado' : 'pendente'}">${m.status}</span>
+        ${state.user?.canManage && m.status === 'pending' ? `<button class="link" data-resend-member="${m.id}" type="button">reenviar</button>` : ''}
+        ${state.user?.canManage ? `<button class="link" data-del-member="${m.id}" type="button">remover</button>` : ''}</div>
       </div>`).join('')
     : '<p class="empty">Nenhum convite ainda</p>';
+  $('teamList').querySelectorAll('[data-del-member]').forEach((btn) => {
+    btn.onclick = async () => {
+      if (!confirm('Remover esta pessoa do espaço?')) return;
+      await Api.del(`/team/members/${btn.dataset.delMember}`);
+      await loadTeam();
+    };
+  });
+  $('teamList').querySelectorAll('[data-resend-member]').forEach((btn) => {
+    btn.onclick = async () => {
+      try {
+        await Api.post(`/team/members/${btn.dataset.resendMember}/resend`, {});
+        toast('Convite reenviado.');
+      } catch (err) {
+        toast(err.message || 'Não foi possível reenviar', true);
+      }
+    };
+  });
+  const extra = $('extraSeatBox');
+  if (extra) {
+    extra.classList.toggle('hidden', state.user?.plan !== 'time' || !state.user?.isOwner);
+    if ($('extraSeatsInput')) $('extraSeatsInput').value = state.user?.extraSeats || 0;
+  }
+}
+
+async function loadGoals() {
+  const { goals } = await Api.get('/goals');
+  const can = state.user?.canManage;
+  if ($('btnAddGoal')) $('btnAddGoal').classList.toggle('hidden', !can);
+  if ($('goalForm')) $('goalForm').classList.toggle('hidden', !can);
+  $('goalsList').innerHTML = goals.length
+    ? goals.map((g) => {
+        const pct = Math.min(100, g.progress?.percent || 0);
+        return `<div class="op-card" style="margin-bottom:10px">
+          <strong>${g.name || g.periodType}</strong>
+          <div class="goal-track" style="margin:8px 0"><span style="width:${pct}%"></span></div>
+          <p class="screen-lead" style="margin:0">${g.metric === 'quantity' ? g.progress.current + ' / ' + g.target : fmt(g.progress.current) + ' / ' + fmt(g.target)} · ${Math.round(pct)}%</p>
+          ${can ? `<button class="link" data-del-goal="${g.id}" type="button">Excluir</button>` : ''}
+        </div>`;
+      }).join('')
+    : '<p class="empty">Nenhuma meta ainda.</p>';
+  $('goalsList').querySelectorAll('[data-del-goal]').forEach((b) => {
+    b.onclick = async () => {
+      await Api.del(`/goals/${b.dataset.delGoal}`);
+      await loadGoals();
+    };
+  });
+  if (can) {
+    const comm = state.commissions?.length ? state.commissions : (await Api.get('/commissions')).commissions || [];
+    state.commissions = comm;
+    $('goalCommission').innerHTML = '<option value="">Carteira toda</option>' + comm.map((c) => `<option value="${c.id}">${c.name}</option>`).join('');
+    $('goalSeller').innerHTML = '<option value="">Espaço todo</option>' + (state.user.isOwner ? `<option value="${state.user.id}">Eu</option>` : '');
+    try {
+      const { members } = await Api.get('/team/members');
+      members.filter((m) => m.memberUserId).forEach((m) => {
+        $('goalSeller').innerHTML += `<option value="${m.memberUserId}">${m.name || m.email}</option>`;
+      });
+    } catch (_) { /* solo */ }
+  }
+}
+
+async function loadCompare() {
+  if (!state.metricCatalog.length) {
+    const { catalog } = await Api.get('/metrics/catalog');
+    state.metricCatalog = catalog || [];
+  }
+  const keys = state.metricCatalog.filter((c) => c.unit !== 'share');
+  $('cmpMetric').innerHTML = keys.map((c) => `<option value="${c.key}">${c.label}</option>`).join('');
+  $('smKey').innerHTML = state.metricCatalog.map((c) => `<option value="${c.key}">${c.label}</option>`).join('');
+  const now = new Date();
+  if (!$('cmpFrom').value) $('cmpFrom').value = `${now.toISOString().slice(0, 7)}-01`;
+  if (!$('cmpTo').value) $('cmpTo').value = now.toISOString().slice(0, 10);
+  $('cmpSellerWrap').classList.toggle('hidden', !state.user?.canSeeTeam);
+  if (state.user?.canSeeTeam) {
+    try {
+      const { members } = await Api.get('/team/members');
+      $('cmpSeller').innerHTML = '<option value="">Todos</option><option value="' + state.user.id + '">Eu</option>' +
+        members.filter((m) => m.memberUserId).map((m) => `<option value="${m.memberUserId}">${m.name || m.email}</option>`).join('');
+    } catch (_) {}
+  }
+  const comm = state.commissions?.length ? state.commissions : (await Api.get('/commissions')).commissions || [];
+  $('cmpCommission').innerHTML = '<option value="">Todas</option>' + comm.map((c) => `<option value="${c.id}">${c.name}</option>`).join('');
+  await runCompare();
+  const { saved } = await Api.get('/metrics/saved');
+  $('savedMetricsList').innerHTML = (saved || []).length
+    ? saved.map((s) => `<div class="kv"><span>${s.name} · ${s.catalogKey}</span>${state.user?.canManage ? `<button class="link" data-del-sm="${s.id}" type="button">excluir</button>` : ''}</div>`).join('')
+    : '<p class="empty">Nenhuma métrica salva.</p>';
+  $('savedMetricsList').querySelectorAll('[data-del-sm]').forEach((b) => {
+    b.onclick = async () => {
+      await Api.del(`/metrics/saved/${b.dataset.delSm}`);
+      await loadCompare();
+    };
+  });
+}
+
+async function runCompare() {
+  const qs = new URLSearchParams({
+    from: $('cmpFrom').value,
+    to: $('cmpTo').value,
+    groupBy: $('cmpGroup').value,
+    metric: $('cmpMetric').value || 'commission_launched',
+  });
+  if ($('cmpSeller')?.value) qs.set('sellerId', $('cmpSeller').value);
+  if ($('cmpCommission')?.value) qs.set('commissionTypeId', $('cmpCommission').value);
+  const data = await Api.get(`/metrics/compare?${qs}`);
+  const t = data.totals || {};
+  const delta = (n) => (n == null ? '—' : (n > 0 ? '+' : '') + n.toFixed(0) + '%');
+  $('cmpTotals').innerHTML = `
+    <div class="kpi-card"><div class="lbl">Atual</div><div class="val mono">${fmt(t.current)}</div></div>
+    <div class="kpi-card"><div class="lbl">Vs anterior</div><div class="val">${delta(t.previousDelta)}</div></div>
+    <div class="kpi-card"><div class="lbl">Vs ano passado</div><div class="val">${delta(t.yearAgoDelta)}</div></div>`;
+  $('cmpTable').innerHTML = (data.series || [])
+    .map((r) => `<div class="kv"><span>${r.bucket}</span><span>${fmt(r.value)} · ${r.launches} lanç.</span></div>`)
+    .join('') || '<p class="empty">Sem dados no período.</p>';
+  if (data.sellers?.length) {
+    $('cmpTable').innerHTML += '<div class="section-title">Por vendedor</div>' +
+      data.sellers.map((s) => `<div class="kv"><span>${s.name}</span><span>${fmt(s.commission)}</span></div>`).join('');
+  }
 }
 
 async function loadAudit() {
@@ -671,8 +1425,18 @@ async function loadPlansScreen() {
     <div class="kv"><span>Status</span><span>${s.status}</span></div>
     <div class="kv"><span>Ciclo</span><span>${s.billingCycle === 'yearly' ? 'Anual' : 'Mensal'}</span></div>
     <div class="kv"><span>Valor</span><span>${priceLabel}</span></div>
-    <div class="kv" style="border:none"><span>Limite de lojas</span><span>${s.limits.maxStores}</span></div>
-    <p style="font-size:12px;color:var(--text-dim);margin:12px 0 0">Trial de 14 dias no site. Aqui a troca de plano é imediata (pagamento real entra na produção).</p>`;
+    <div class="kv" style="border:none"><span>1 mês grátis</span><span>Sem reembolso depois</span></div>
+    <p style="font-size:12px;color:var(--text-dim);margin:12px 0 0">1 mês grátis para testar. Não há reembolso após o período gratuito.${s.trialEndsAt ? ' Trial até ' + new Date(s.trialEndsAt).toLocaleDateString('pt-BR') + '.' : ''}</p>
+    ${sub.isOwner ? '<button class="btn-secondary" type="button" id="btnCancelPlan" style="margin-top:12px">Cancelar assinatura</button>' : ''}`;
+  const cancel = $('btnCancelPlan');
+  if (cancel) {
+    cancel.onclick = async () => {
+      if (!confirm('Cancelar impede novas cobranças. O acesso segue até o fim do período.')) return;
+      const res = await Api.post('/billing/cancel', {});
+      alert(res.message);
+      await loadPlansScreen();
+    };
+  }
 
   const cycle = state.billingCycle;
   $('plansAppGrid').innerHTML = plans.map((p) => {
@@ -741,41 +1505,65 @@ function wireEvents() {
   $('btnGoogle').onclick = () => toast('Login social Google: conecte OAuth em produção. Use e-mail/senha na demo.', true);
   $('btnApple').onclick = () => toast('Login social Apple: conecte OAuth em produção. Use e-mail/senha na demo.', true);
 
-  $('btnNicheNext').onclick = () => {
-    $('wizardNiche').classList.add('hidden');
-    $('wizardMulti').classList.remove('hidden');
+  $('btnProfileNext').onclick = async () => {
+    try {
+      await saveProfileFrom('obName', 'obProfession', 'obCompany', 'obCurrency');
+      await loadCommissionCatalog();
+      await renderOnboardingCommissionList();
+      showWizard('wizardCommissions');
+    } catch (err) {
+      alert(err.message);
+    }
   };
-  $('wizardMulti').querySelectorAll('[data-multi]').forEach((btn) => {
-    btn.onclick = () => {
-      state.multiStore = Number(btn.dataset.multi);
-      $('wizardMulti').querySelectorAll('button').forEach((b) => b.classList.remove('on'));
-      btn.classList.add('on');
-    };
-  });
-  $('btnMultiNext').onclick = () => {
-    $('wizardMulti').classList.add('hidden');
-    $('wizardStore').classList.remove('hidden');
+  $('btnObAddCommission').onclick = () => openCommissionForm(null, 'onboarding');
+  $('btnObFormBack').onclick = async () => {
+    await renderOnboardingCommissionList();
+    showWizard('wizardCommissions');
+  };
+  $('btnObSaveCommission').onclick = () =>
+    handleSaveCommission($('btnObSaveCommission'), 'obCfMount', 'obCfError', async () => {
+      await renderOnboardingCommissionList();
+      showWizard('wizardCommissions');
+      $('btnObSaveCommission').disabled = false;
+      $('btnObSaveCommission').textContent = 'Salvar comissão';
+    });
+  $('btnObCommissionsNext').onclick = () => {
+    if (!state.commissions.length) return alert('Cadastre pelo menos uma comissão para continuar.');
+    $('readyTitle').textContent = `Pronto, ${firstName()}!`;
+    $('readySub').textContent = 'Suas regras estão salvas. Agora você entra em Minhas Comissões — pode editar e adicionar outras quando quiser.';
+    showWizard('wizardReady');
   };
   $('btnFinishOnboarding').onclick = async () => {
-    const name = $('firstStoreName').value.trim();
-    if (!name) return alert('Informe o nome da loja');
-    await Api.patch('/auth/me', {
-      niche: state.selectedNiche,
-      multiStore: !!state.multiStore,
-      onboardingDone: true,
-      biometryEnabled: localStorage.getItem('cp_biometry') === '1',
-    });
-    await Api.post('/stores', {
-      name,
-      cnpj: $('firstStoreCnpj').value,
-      color: $('firstStoreColor').value,
-      ruleType: $('firstStoreRule').value,
-      paymentDays: Number($('firstStoreDays').value) || 30,
-    });
+    await Api.patch('/auth/me', { onboardingDone: true });
     const me = await Api.get('/auth/me');
     state.user = me.user;
     state.nicheFields = me.nicheFields;
-    await enterApp();
+    await enterApp('comissoes');
+  };
+
+  $('btnAddCommission').onclick = () => openCommissionForm(null, 'comissoes');
+  $('btnCfBack').onclick = () => goTo('comissoes');
+  $('btnSaveCommission').onclick = () =>
+    handleSaveCommission($('btnSaveCommission'), 'cfMount', 'cfError', async () => {
+      await goTo('comissoes');
+    });
+  $('btnDeleteCommission').onclick = async () => {
+    if (!state.commissionDraft?.id) return;
+    if (!confirm('Excluir esta comissão? Lançamentos antigos não são apagados.')) return;
+    try {
+      await Api.del(`/commissions/${state.commissionDraft.id}`);
+      await goTo('comissoes');
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+  $('btnSaveProfile').onclick = async () => {
+    try {
+      await saveProfileFrom('pfName', 'pfProfession', 'pfCompany', 'pfCurrency');
+      alert('Perfil salvo.');
+    } catch (err) {
+      alert(err.message);
+    }
   };
 
   document.querySelectorAll('.nav-item, .bn-item').forEach((btn) => {
@@ -791,27 +1579,29 @@ function wireEvents() {
     ov.addEventListener('click', (e) => { if (e.target === ov) hide(ov); });
   });
 
-  $('storeFilter').onchange = async () => {
-    state.selectedStoreId = $('storeFilter').value;
-    const active = document.querySelector('.screen.active')?.id?.replace('screen-', '');
-    if (active) await goTo(active);
-  };
-  $('btnNewSaleHero').onclick = openSaleModal;
-  $('btnNewSaleSide').onclick = openSaleModal;
-  $('fabNewSale').onclick = openSaleModal;
+  if ($('storeFilter')) {
+    $('storeFilter').onchange = async () => {
+      state.selectedStoreId = $('storeFilter').value;
+      const active = document.querySelector('.screen.active')?.id?.replace('screen-', '');
+      if (active) await goTo(active);
+    };
+  }
+  $('fabNewSale').onclick = () => goTo('dashboard');
   $('btnSaveSale').onclick = saveSale;
-  $('btnAddStore').onclick = openStoreModal;
-  $('btnSaveStore').onclick = async () => {
-    await Api.post('/stores', {
-      name: $('nsName').value,
-      cnpj: $('nsCnpj').value,
-      color: $('nsColor').value,
-      ruleType: $('nsRule').value,
-      paymentDays: Number($('nsDays').value) || 30,
-    });
-    hide($('storeOverlay'));
-    await loadStoresScreen();
-  };
+  if ($('btnAddStore')) $('btnAddStore').onclick = openStoreModal;
+  if ($('btnSaveStore')) {
+    $('btnSaveStore').onclick = async () => {
+      await Api.post('/stores', {
+        name: $('nsName').value,
+        cnpj: $('nsCnpj').value,
+        color: $('nsColor').value,
+        ruleType: $('nsRule').value,
+        paymentDays: Number($('nsDays').value) || 30,
+      });
+      hide($('storeOverlay'));
+      if ($('storesList')) await loadStoresScreen();
+    };
+  }
   $('btnAddLead').onclick = openLeadModal;
   $('btnSaveLead').onclick = async () => {
     await Api.post('/leads', {
@@ -819,7 +1609,7 @@ function wireEvents() {
       clientName: $('leadClient').value,
       value: Number($('leadValue').value) || 0,
       probability: Number($('leadProb').value) || 50,
-      storeId: $('leadStore').value || null,
+      storeId: $('leadStore')?.value || null,
       stage: $('leadStage').value,
     });
     hide($('leadOverlay'));
@@ -835,6 +1625,77 @@ function wireEvents() {
     hide($('inviteOverlay'));
     await loadTeam();
   };
+  if ($('btnSaveSeats')) {
+    $('btnSaveSeats').onclick = async () => {
+      const res = await Api.post('/billing/extra-seats', { extraSeats: Number($('extraSeatsInput').value) || 0 });
+      state.user.extraSeats = res.extraSeats;
+      alert(`Assentos extras: ${res.extraSeats} (${fmt(res.monthlyExtra)}/mês)`);
+      await loadTeam();
+    };
+  }
+  if ($('btnAddGoal')) $('btnAddGoal').onclick = () => $('goalForm')?.classList.remove('hidden');
+  if ($('goalPeriod')) {
+    $('goalPeriod').onchange = () => $('goalRangeWrap')?.classList.toggle('hidden', $('goalPeriod').value !== 'range');
+  }
+  if ($('btnSaveGoal')) {
+    $('btnSaveGoal').onclick = async () => {
+      await Api.post('/goals', {
+        name: $('goalName').value,
+        periodType: $('goalPeriod').value,
+        periodStart: $('goalFrom').value || undefined,
+        periodEnd: $('goalTo').value || undefined,
+        metric: $('goalMetric').value,
+        target: Number($('goalTarget').value) || 0,
+        sellerId: $('goalSeller').value || null,
+        commissionTypeId: $('goalCommission').value || null,
+      });
+      $('goalTarget').value = '';
+      await loadGoals();
+    };
+  }
+  if ($('btnRunCompare')) $('btnRunCompare').onclick = runCompare;
+  if ($('btnSaveMetric')) {
+    $('btnSaveMetric').onclick = async () => {
+      await Api.post('/metrics/saved', { name: $('smName').value, catalogKey: $('smKey').value, pinDashboard: true });
+      $('smName').value = '';
+      await loadCompare();
+    };
+  }
+  if ($('authForgotLink')) {
+    $('authForgotLink').onclick = () => $('forgotBox').classList.toggle('hidden');
+  }
+  if ($('btnForgot')) {
+    $('btnForgot').onclick = async () => {
+      const res = await Api.post('/auth/forgot', { email: $('forgotEmail').value || $('authEmail').value });
+      toast(res.message || 'Enviado');
+    };
+  }
+  if ($('btnReset')) {
+    $('btnReset').onclick = async () => {
+      const data = await Api.post('/auth/reset', { token: urlParams.get('reset'), password: $('resetPassword').value });
+      Api.setToken(data.token);
+      state.user = data.user;
+      await enterApp();
+    };
+  }
+  if ($('btnAcceptInvite')) {
+    $('btnAcceptInvite').onclick = async () => {
+      if (!$('termsAccept')?.checked) {
+        toast('Aceite os Termos para entrar.', true);
+        return;
+      }
+      const data = await Api.post('/auth/accept-invite', {
+        token: urlParams.get('invite'),
+        password: $('inviteJoinPassword').value,
+        name: $('inviteJoinName').value,
+        acceptedTerms: true,
+        acceptedPrivacy: true,
+      });
+      Api.setToken(data.token);
+      state.user = data.user;
+      await enterApp('dashboard');
+    };
+  }
   $('btnUpdateSale').onclick = async () => {
     await Api.patch(`/sales/${state.currentSaleId}`, { status: $('detailStatus').value });
     hide($('detailOverlay'));
@@ -855,19 +1716,11 @@ function wireEvents() {
   $('globalSearch').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') goTo('vendas');
   });
-  $('simUnits').oninput = runSim;
-  $('simTicket').oninput = runSim;
-  $('simStore').onchange = runSim;
-  $('btnRecon').onclick = () => $('reconFile').click();
-  $('reconFile').onchange = () => { if ($('reconFile').files[0]) runRecon(); };
-  $('tglComissao').onclick = function () {
-    this.classList.add('on'); $('tglFaturamento').classList.remove('on');
-    state.chartMode = 'commission'; drawSeriesChart('mainChart', 'chartAxis', state.series, state.chartMode);
-  };
-  $('tglFaturamento').onclick = function () {
-    this.classList.add('on'); $('tglComissao').classList.remove('on');
-    state.chartMode = 'revenue'; drawSeriesChart('mainChart', 'chartAxis', state.series, state.chartMode);
-  };
+  if ($('simUnits')) $('simUnits').oninput = runSim;
+  if ($('simTicket')) $('simTicket').oninput = runSim;
+  if ($('simStore')) $('simStore').onchange = runSim;
+  if ($('btnRecon')) $('btnRecon').onclick = () => $('reconFile')?.click();
+  if ($('reconFile')) $('reconFile').onchange = () => { if ($('reconFile').files[0]) runRecon(); };
   document.querySelectorAll('.theme-toggle button').forEach((b) => {
     b.onclick = async () => {
       await Api.patch('/auth/me', { theme: b.dataset.theme });
@@ -885,6 +1738,24 @@ function wireEvents() {
     await Api.patch('/auth/me', { biometryEnabled: this.classList.contains('on') });
     state.user.biometryEnabled = this.classList.contains('on');
   };
+  if ($('btnInbox')) $('btnInbox').onclick = () => openInbox();
+  if ($('btnReadAll')) {
+    $('btnReadAll').onclick = async () => {
+      await Api.post('/inbox/notifications/read-all', {});
+      await openInbox();
+    };
+  }
+  document.querySelectorAll('[data-pref]').forEach((btn) => {
+    btn.onclick = async () => {
+      btn.classList.toggle('on');
+      try {
+        await Api.patch('/inbox/prefs', { [btn.dataset.pref]: btn.classList.contains('on') });
+      } catch (err) {
+        btn.classList.toggle('on');
+        toast(err.message || 'Não foi possível salvar', true);
+      }
+    };
+  });
   $('btnLogout').onclick = () => {
     Api.setToken(null);
     location.reload();
@@ -923,6 +1794,27 @@ async function boot() {
   }
 
   // Vindo do site com plano escolhido → abre login/registro direto
+  if (urlParams.get('invite')) {
+    $('splash').classList.add('hide');
+    show($('login'));
+    $('inviteBox').classList.remove('hidden');
+    $('termsAcceptRow').style.display = 'flex';
+    try {
+      const { invite } = await Api.get(`/auth/invite/${urlParams.get('invite')}`);
+      $('inviteHint').textContent = `${invite.ownerName} te convidou como ${invite.role}. Crie uma senha para ${invite.email}.`;
+      $('authEmail').value = invite.email;
+      $('inviteJoinName').value = invite.name || '';
+    } catch (e) {
+      toast(e.message || 'Convite inválido', true);
+    }
+    return;
+  }
+  if (urlParams.get('reset')) {
+    $('splash').classList.add('hide');
+    show($('login'));
+    $('resetBox').classList.remove('hidden');
+    return;
+  }
   if (urlParams.get('mode') === 'register' || urlParams.get('plan')) {
     $('splash').classList.add('hide');
     show($('login'));

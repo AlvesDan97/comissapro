@@ -5,8 +5,11 @@ const { authRequired } = require('../middleware/auth');
 const { asyncHandler } = require('../middleware/asyncHandler');
 const { audit } = require('../services/audit');
 
+const { workspaceId, requirePipeline } = require('../services/scope');
+
 const router = express.Router();
 router.use(authRequired);
+router.use(requirePipeline);
 
 function mapLead(row) {
   return {
@@ -30,7 +33,7 @@ router.get(
   '/',
   asyncHandler(async (req, res) => {
     const rows = await db.all('SELECT * FROM leads WHERE user_id=? ORDER BY updated_at DESC', [
-      req.user.id,
+      workspaceId(req),
     ]);
     res.json({ leads: rows.map(mapLead) });
   })
@@ -48,7 +51,7 @@ router.post(
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
-        req.user.id,
+        workspaceId(req),
         b.storeId || null,
         b.title,
         b.clientName || null,
@@ -73,7 +76,7 @@ router.patch(
   asyncHandler(async (req, res) => {
     const row = await db.get('SELECT * FROM leads WHERE id=? AND user_id=?', [
       req.params.id,
-      req.user.id,
+      workspaceId(req),
     ]);
     if (!row) return res.status(404).json({ error: 'Lead não encontrado' });
     const before = mapLead(row);
@@ -106,7 +109,7 @@ router.delete(
   asyncHandler(async (req, res) => {
     const row = await db.get('SELECT * FROM leads WHERE id=? AND user_id=?', [
       req.params.id,
-      req.user.id,
+      workspaceId(req),
     ]);
     if (!row) return res.status(404).json({ error: 'Lead não encontrado' });
     await db.run('DELETE FROM leads WHERE id=?', [row.id]);

@@ -1,3 +1,4 @@
+require('./loadEnv');
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
@@ -13,6 +14,7 @@ const dashboardRoutes = require('./routes/dashboard');
 const toolsRoutes = require('./routes/tools');
 const teamRoutes = require('./routes/team');
 const billingRoutes = require('./routes/billing');
+const commissionRoutes = require('./routes/commissions');
 
 const app = express();
 const PORT = process.env.PORT || 3847;
@@ -70,7 +72,7 @@ app.get('/api/health', async (_req, res) => {
     res.json({
       ok: true,
       name: 'Comiss API',
-      version: '1.1.0',
+      version: '1.2.0',
       db: db.usePostgres ? 'postgres' : 'sqlite',
       time: new Date().toISOString(),
     });
@@ -81,6 +83,9 @@ app.get('/api/health', async (_req, res) => {
 
 app.use('/api/auth/login', loginLimiter);
 app.use('/api/auth/register', loginLimiter);
+app.use('/api/auth/forgot', loginLimiter);
+app.use('/api/auth/reset', loginLimiter);
+app.use('/api/auth/accept-invite', loginLimiter);
 app.use('/api', apiLimiter);
 
 app.use('/api/auth', authRoutes);
@@ -91,6 +96,14 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/tools', toolsRoutes);
 app.use('/api/team', teamRoutes);
 app.use('/api/billing', billingRoutes);
+app.use('/api/commissions', commissionRoutes);
+app.use('/api/goals', require('./routes/goals'));
+app.use('/api/metrics', require('./routes/metrics'));
+app.use('/api/inbox', require('./routes/inbox'));
+
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: `Rota não encontrada: ${req.method} ${req.originalUrl}` });
+});
 
 app.use(express.static(frontendPath, { maxAge: isProd ? '1h' : 0 }));
 
@@ -138,6 +151,7 @@ async function start() {
   console.log(`[boot] NODE_ENV=${process.env.NODE_ENV || 'undefined'} PORT=${PORT}`);
   console.log(`[boot] DATABASE_URL=${process.env.DATABASE_URL ? 'set' : 'missing'}`);
   console.log(`[boot] JWT_SECRET=${process.env.JWT_SECRET ? 'set' : 'missing'}`);
+  console.log(`[boot] ASAAS=${process.env.ASAAS_API_KEY ? 'set' : 'missing'} url=${process.env.ASAAS_API_URL || 'sandbox-default'}`);
 
   if (isProd && !process.env.JWT_SECRET) {
     console.error('FATAL: defina JWT_SECRET nas Variables do Railway (Settings → Variables).');
@@ -153,6 +167,8 @@ async function start() {
     });
     server.on('error', reject);
   });
+  const { startFollowupJob } = require('./services/followups');
+  startFollowupJob();
 }
 
 start().catch((err) => {

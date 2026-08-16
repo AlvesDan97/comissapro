@@ -8,18 +8,17 @@ const PLANS = {
     id: 'solo',
     name: 'Solo',
     priceMonthly: 49,
-    priceYearly: 490, // ~2 meses grátis
+    priceYearly: 490,
     currency: 'BRL',
-    tagline: 'Para quem vende em poucas empresas',
+    tagline: 'Sua carteira de comissões',
     maxStores: 3,
     maxTeamMembers: 0,
     features: [
-      'Até 3 lojas / fornecedores',
-      'Vendas com snapshot histórico',
-      'Dashboard e metas em faixas',
-      'Simulador What-If',
+      'Motor de comissão completo',
+      'Painel pessoal, metas e comparativo no tempo',
+      'Simulador rápido',
       'Exportação CSV',
-      'Suporte por e-mail',
+      '1 mês grátis · sem reembolso depois',
     ],
     highlighted: false,
   },
@@ -29,17 +28,17 @@ const PLANS = {
     priceMonthly: 89,
     priceYearly: 890,
     currency: 'BRL',
-    tagline: 'Para multilojas e conferência de extrato',
+    tagline: 'Para quem vive de várias regras de comissão',
     maxStores: 25,
     maxTeamMembers: 1,
+    extraSeatPrice: 59,
     features: [
       'Tudo do Solo',
-      'Até 25 lojas',
-      'Conciliação Smart (PDF/Excel)',
-      'Pipeline + recebíveis',
-      'Alisamento de renda',
-      '2FA e trilha de auditoria',
-      '1 convite de parceiro (split)',
+      'Pipeline comercial',
+      '1 parceiro no espaço',
+      'Painel do espaço (2 pessoas)',
+      'Catálogo de métricas',
+      '1 mês grátis · sem reembolso depois',
     ],
     highlighted: true,
   },
@@ -49,7 +48,7 @@ const PLANS = {
     priceMonthly: 149,
     priceYearly: 1490,
     currency: 'BRL',
-    tagline: 'Para equipes e splits com papéis',
+    tagline: 'Para equipes com papéis e ranking',
     maxStores: 100,
     maxTeamMembers: 3,
     extraSeatPrice: 59,
@@ -58,8 +57,8 @@ const PLANS = {
       'Até 3 usuários inclusos',
       'Usuário extra R$ 59/mês',
       'Papéis: ver / lançar / admin',
-      'Split com acordo rastreado',
-      'Prioridade no suporte',
+      'Painel do time, ranking e comparar por vendedor',
+      '1 mês grátis · sem reembolso depois',
     ],
     highlighted: false,
   },
@@ -82,4 +81,9 @@ function planLimits(planId) {
   };
 }
 
-module.exports = { PLANS, listPlans, getPlan, planLimits };
+function seatCap(owner) {
+  const limits = planLimits(owner?.plan || 'solo');
+  return (limits.maxTeamMembers || 0) + (Number(owner?.extra_seats) || 0);
+}
+
+module.exports = { PLANS, listPlans, getPlan, planLimits, seatCap };
