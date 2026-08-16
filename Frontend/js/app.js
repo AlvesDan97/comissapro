@@ -220,6 +220,10 @@ async function doAuth() {
         return;
       }
       const name = $('authName').value.trim();
+      if (!name) {
+        toast('Informe seu nome.', true);
+        return;
+      }
       if (!state.selectedPlanId) {
         toast('Escolha um plano para criar a conta.', true);
         return;
@@ -245,6 +249,10 @@ async function doAuth() {
       }
     } else {
       data = await Api.post('/auth/login', { email, password, otp: otp || undefined });
+    }
+    if (!data?.token || !data.user) {
+      toast('Não foi possível entrar. Confirme o e-mail ou tente de novo.', true);
+      return;
     }
     Api.setToken(data.token);
     state.user = data.user;
@@ -304,7 +312,7 @@ function applyUserChrome() {
   $('sideAvatar').textContent = ini;
   $('topAvatar').textContent = ini;
   $('sideName').textContent = u.name;
-  $('topName').textContent = u.name.split(' ')[0];
+  $('topName').textContent = firstName();
   $('sideRole').textContent = u.profession || u.company || 'Vendedor';
   document.body.classList.toggle('theme-light', u.theme === 'light');
   document.querySelectorAll('.theme-toggle button').forEach((b) => {
@@ -364,21 +372,25 @@ async function goTo(name) {
     name === 'planos';
   if ($('fabNewSale')) $('fabNewSale').classList.toggle('hidden', hideFab);
 
-  if (name === 'dashboard') await loadDashboard();
-  if (name === 'comissoes') await loadCommissionsScreen();
-  if (name === 'perfil') loadProfileScreen();
-  if (name === 'vendas') await loadSales();
-  if (name === 'pipeline') await loadLeads();
-  if (name === 'simulador') await loadSimulator();
-  if (name === 'equipe') await loadTeam();
-  if (name === 'metas') await loadGoals();
-  if (name === 'comparar') await loadCompare();
-  if (name === 'planos') await loadPlansScreen();
-  if (name === 'pendencias') await loadPendencias();
-  if (name === 'ajuda') await loadAjuda();
-  if (name === 'config') {
-    applyUserChrome();
-    await loadNotifyPrefs();
+  try {
+    if (name === 'dashboard') await loadDashboard();
+    if (name === 'comissoes') await loadCommissionsScreen();
+    if (name === 'perfil') loadProfileScreen();
+    if (name === 'vendas') await loadSales();
+    if (name === 'pipeline') await loadLeads();
+    if (name === 'simulador') await loadSimulator();
+    if (name === 'equipe') await loadTeam();
+    if (name === 'metas') await loadGoals();
+    if (name === 'comparar') await loadCompare();
+    if (name === 'planos') await loadPlansScreen();
+    if (name === 'pendencias') await loadPendencias();
+    if (name === 'ajuda') await loadAjuda();
+    if (name === 'config') {
+      applyUserChrome();
+      await loadNotifyPrefs();
+    }
+  } catch (err) {
+    toast(err.message || 'Não foi possível carregar esta tela.', true);
   }
 }
 
@@ -487,8 +499,13 @@ async function loadCommissionCatalog() {
 }
 
 async function refreshCommissions() {
-  const { commissions } = await Api.get('/commissions');
-  state.commissions = commissions || [];
+  try {
+    const { commissions } = await Api.get('/commissions');
+    state.commissions = commissions || [];
+  } catch (err) {
+    state.commissions = state.commissions || [];
+    throw err;
+  }
   return state.commissions;
 }
 
@@ -541,31 +558,35 @@ function renderCommissionForm(mountId) {
 }
 
 async function openCommissionForm(id, from) {
-  await loadCommissionCatalog();
-  state.commissionFormReturn = from || 'comissoes';
-  if (id) {
-    const { commission } = await Api.get(`/commissions/${id}`);
-    state.commissionDraft = CommissionUI.draftFrom(commission);
-  } else {
-    state.commissionDraft = CommissionUI.emptyDraft();
+  try {
+    await loadCommissionCatalog();
+    state.commissionFormReturn = from || 'comissoes';
+    if (id) {
+      const { commission } = await Api.get(`/commissions/${id}`);
+      state.commissionDraft = CommissionUI.draftFrom(commission);
+    } else {
+      state.commissionDraft = CommissionUI.emptyDraft();
+    }
+    const editing = !!state.commissionDraft.id;
+    if (from === 'onboarding') {
+      $('obFormTitle').textContent = editing ? 'Editar comissão' : 'Nova comissão';
+      renderCommissionForm('obCfMount');
+      showWizard('wizardCommissionForm');
+      return;
+    }
+    $('cfPageTitle').textContent = editing ? 'Editar comissão' : 'Nova comissão';
+    $('btnDeleteCommission').classList.toggle('hidden', !editing);
+    if ($('cfError')) {
+      $('cfError').classList.add('hidden');
+      $('cfError').textContent = '';
+    }
+    $('btnSaveCommission').disabled = false;
+    $('btnSaveCommission').textContent = 'Salvar comissão';
+    renderCommissionForm('cfMount');
+    await goTo('comissao-form');
+  } catch (err) {
+    toast(err.message || 'Não foi possível abrir a comissão.', true);
   }
-  const editing = !!state.commissionDraft.id;
-  if (from === 'onboarding') {
-    $('obFormTitle').textContent = editing ? 'Editar comissão' : 'Nova comissão';
-    renderCommissionForm('obCfMount');
-    showWizard('wizardCommissionForm');
-    return;
-  }
-  $('cfPageTitle').textContent = editing ? 'Editar comissão' : 'Nova comissão';
-  $('btnDeleteCommission').classList.toggle('hidden', !editing);
-  if ($('cfError')) {
-    $('cfError').classList.add('hidden');
-    $('cfError').textContent = '';
-  }
-  $('btnSaveCommission').disabled = false;
-  $('btnSaveCommission').textContent = 'Salvar comissão';
-  renderCommissionForm('cfMount');
-  await goTo('comissao-form');
 }
 
 async function saveCommissionFrom(mountId) {
@@ -736,7 +757,7 @@ function openStoreModal() {
 async function loadDashboard() {
   const scope = state.user?.canSeeTeam ? state.dashScope || 'workspace' : 'me';
   const data = await Api.get(`/dashboard?scope=${scope}`);
-  const k = data.kpis;
+  const k = data.kpis || {};
   const monthLabel = new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
   $('dashHello').textContent = `Olá, ${firstName()}! ${data.scope === 'workspace' ? 'Visão do espaço.' : 'Toque numa comissão para lançar.'}`;
   $('dashMonthLabel').textContent = `Comissão · ${monthLabel}`;
@@ -1897,11 +1918,15 @@ function wireEvents() {
     showWizard('wizardReady');
   };
   $('btnFinishOnboarding').onclick = async () => {
-    await Api.patch('/auth/me', { onboardingDone: true });
-    const me = await Api.get('/auth/me');
-    state.user = me.user;
-    state.nicheFields = me.nicheFields;
-    await enterApp('comissoes');
+    try {
+      await Api.patch('/auth/me', { onboardingDone: true });
+      const me = await Api.get('/auth/me');
+      state.user = me.user;
+      state.nicheFields = me.nicheFields;
+      await enterApp('comissoes');
+    } catch (err) {
+      toast(err.message || 'Não foi possível entrar no app.', true);
+    }
   };
 
   $('btnAddCommission').onclick = () => openCommissionForm(null, 'comissoes');
@@ -2036,8 +2061,12 @@ function wireEvents() {
   }
   if ($('btnForgot')) {
     $('btnForgot').onclick = async () => {
-      const res = await Api.post('/auth/forgot', { email: $('forgotEmail').value || $('authEmail').value });
-      toast(res.message || 'Enviado');
+      try {
+        const res = await Api.post('/auth/forgot', { email: $('forgotEmail').value || $('authEmail').value });
+        toast(res.message || 'Enviado');
+      } catch (err) {
+        toast(err.message || 'Não foi possível enviar.', true);
+      }
     };
   }
   if ($('btnReset')) {
@@ -2047,16 +2076,28 @@ function wireEvents() {
         toast('Senha fraca. Use 8+ caracteres, com maiúscula, minúscula e número.', true);
         return;
       }
-      const data = await Api.post('/auth/reset', { token: urlParams.get('reset'), password });
-      Api.setToken(data.token);
-      state.user = data.user;
-      await enterApp();
+      try {
+        const data = await Api.post('/auth/reset', { token: urlParams.get('reset'), password });
+        if (!data?.token || !data.user) {
+          toast('Não foi possível entrar. Tente o link de novo.', true);
+          return;
+        }
+        Api.setToken(data.token);
+        state.user = data.user;
+        await enterApp();
+      } catch (err) {
+        toast(err.message || 'Não foi possível redefinir a senha.', true);
+      }
     };
   }
   if ($('btnResendConfirm')) {
     $('btnResendConfirm').onclick = async () => {
-      const res = await Api.post('/auth/resend-confirm', { email: $('authEmail').value });
-      toast(res.message || 'Enviado');
+      try {
+        const res = await Api.post('/auth/resend-confirm', { email: $('authEmail').value });
+        toast(res.message || 'Enviado');
+      } catch (err) {
+        toast(err.message || 'Não foi possível reenviar.', true);
+      }
     };
   }
   if ($('btnAcceptInvite')) {
@@ -2069,22 +2110,34 @@ function wireEvents() {
         toast('Senha fraca. Use 8+ caracteres, com maiúscula, minúscula e número.', true);
         return;
       }
-      const data = await Api.post('/auth/accept-invite', {
-        token: urlParams.get('invite'),
-        password: $('inviteJoinPassword').value,
-        name: $('inviteJoinName').value,
-        acceptedTerms: true,
-        acceptedPrivacy: true,
-      });
-      Api.setToken(data.token);
-      state.user = data.user;
-      await enterApp('dashboard');
+      try {
+        const data = await Api.post('/auth/accept-invite', {
+          token: urlParams.get('invite'),
+          password: $('inviteJoinPassword').value,
+          name: $('inviteJoinName').value,
+          acceptedTerms: true,
+          acceptedPrivacy: true,
+        });
+        if (!data?.token || !data.user) {
+          toast('Não foi possível entrar com o convite.', true);
+          return;
+        }
+        Api.setToken(data.token);
+        state.user = data.user;
+        await enterApp('dashboard');
+      } catch (err) {
+        toast(err.message || 'Não foi possível aceitar o convite.', true);
+      }
     };
   }
   $('btnUpdateSale').onclick = async () => {
-    await Api.patch(`/sales/${state.currentSaleId}`, { status: $('detailStatus').value });
-    hide($('detailOverlay'));
-    await loadSales();
+    try {
+      await Api.patch(`/sales/${state.currentSaleId}`, { status: $('detailStatus').value });
+      hide($('detailOverlay'));
+      await loadSales();
+    } catch (err) {
+      toast(err.message || 'Não foi possível atualizar a venda.', true);
+    }
   };
   $('saleFilters').querySelectorAll('.chip').forEach((c) => {
     c.onclick = () => {
@@ -2170,6 +2223,9 @@ async function boot() {
     show($('login'));
     try {
       const data = await Api.post('/auth/confirm', { token: urlParams.get('confirm') });
+      if (!data?.token || !data.user) {
+        throw new Error('Confirmação incompleta. Peça um novo e-mail.');
+      }
       Api.setToken(data.token);
       state.user = data.user;
       state.nicheFields = data.nicheFields || {};
@@ -2186,6 +2242,7 @@ async function boot() {
   if (Api.token) {
     try {
       const me = await Api.get('/auth/me');
+      if (!me?.user) throw new Error('Sessão inválida');
       state.user = me.user;
       state.nicheFields = me.nicheFields || {};
       $('splash').classList.add('hide');

@@ -10,6 +10,8 @@ const {
   incomeSmoothing,
   DEFAULT_RULES,
 } = require('../services/commissionEngine');
+const { workspaceId } = require('../services/scope');
+const { safeJson } = require('../services/safeJson');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
 const router = express.Router();
@@ -26,16 +28,16 @@ router.post(
     if (storeId) {
       const store = await db.get('SELECT * FROM stores WHERE id=? AND user_id=?', [
         storeId,
-        req.user.id,
+        workspaceId(req),
       ]);
       if (!store) return res.status(404).json({ error: 'Loja não encontrada' });
       ruleType = store.rule_type;
-      rule = JSON.parse(store.rule_json);
+      rule = safeJson(store.rule_json, DEFAULT_RULES.bands);
       const month = new Date().toISOString().slice(0, 7);
       currentUnits = (
         await db.get(
           `SELECT COUNT(*) as c FROM sales WHERE user_id=? AND store_id=? AND substr(sale_date,1,7)=? AND status!='cancelada'`,
-          [req.user.id, storeId, month]
+          [workspaceId(req), storeId, month]
         )
       ).c;
     }
@@ -177,7 +179,7 @@ router.get(
         storeId: r.store_id,
         filename: r.filename,
         status: r.status,
-        summary: JSON.parse(r.summary_json),
+        summary: safeJson(r.summary_json),
         createdAt: r.created_at,
       })),
     });

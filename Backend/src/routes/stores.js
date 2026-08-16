@@ -6,6 +6,8 @@ const { asyncHandler } = require('../middleware/asyncHandler');
 const { audit } = require('../services/audit');
 const { DEFAULT_RULES } = require('../services/commissionEngine');
 const { planLimits } = require('../services/plans');
+const { workspaceId } = require('../services/scope');
+const { safeJson } = require('../services/safeJson');
 
 const router = express.Router();
 router.use(authRequired);
@@ -19,7 +21,7 @@ function mapStore(row) {
     logoInitials: row.logo_initials,
     paymentDays: row.payment_days,
     ruleType: row.rule_type,
-    rule: JSON.parse(row.rule_json),
+    rule: safeJson(row.rule_json, DEFAULT_RULES.fixed || {}),
     active: !!row.active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -41,7 +43,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const rows = await db.all(
       'SELECT * FROM stores WHERE user_id = ? AND active = 1 ORDER BY name',
-      [req.user.id]
+      [workspaceId(req)]
     );
     const stores = [];
     for (const s of rows) {
@@ -52,13 +54,13 @@ router.get(
                 COALESCE(SUM(gross_value),0) as revenue,
                 COALESCE(SUM(commission_total),0) as commission
          FROM sales WHERE user_id=? AND store_id=? AND substr(sale_date,1,7)=? AND status!='cancelada'`,
-        [req.user.id, s.id, month]
+        [workspaceId(req), s.id, month]
       );
       const pending = (
         await db.get(
           `SELECT COUNT(*) as c FROM receivables WHERE user_id=? AND sale_id IN
            (SELECT id FROM sales WHERE store_id=?) AND status IN ('previsto','parcial','atrasado')`,
-          [req.user.id, s.id]
+          [workspaceId(req), s.id]
         )
       ).c;
       stores.push({
@@ -79,9 +81,9 @@ router.post(
     const { name, cnpj, color, paymentDays, ruleType, rule } = req.body || {};
     if (!name) return res.status(400).json({ error: 'Nome da loja é obrigatório' });
 
-    const user = await db.get('SELECT plan FROM users WHERE id=?', [req.user.id]);
+    const user = await db.get('SELECT plan FROM users WHERE id=?', [workspaceId(req)]);
     const limits = planLimits(user?.plan || 'solo');
-    const count = (await db.get('SELECT COUNT(*) as c FROM stores WHERE user_id=? AND active=1', [req.user.id])).c;
+    const count = (await db.get('SELECT COUNT(*) as c FROM stores WHERE user_id=? AND active=1', [workspaceId(req)])).c;
     if (count >= limits.maxStores) {
       return res.status(403).json({
         error: `Seu plano permite até ${limits.maxStores} lojas. Faça upgrade para continuar.`,
@@ -100,7 +102,7 @@ router.post(
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
-        req.user.id,
+        workspaceId(req),
         name,
         cnpj || null,
         color || '#3FDA9A',
@@ -116,7 +118,7 @@ router.post(
     await db.run(
       `INSERT INTO commission_rule_versions (id, store_id, user_id, rule_type, rule_json, effective_from, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [versionId, id, req.user.id, type, JSON.stringify(ruleObj), now.slice(0, 10), now]
+      [versionId, id, workspaceId(req), type, JSON.stringify(ruleObj), now.slice(0, 10), now]
     );
 
     const store = mapStore(await db.get('SELECT * FROM stores WHERE id = ?', [id]));
@@ -130,7 +132,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const row = await db.get('SELECT * FROM stores WHERE id = ? AND user_id = ?', [
       req.params.id,
-      req.user.id,
+      workspaceId(req),
     ]);
     if (!row) return res.status(404).json({ error: 'Loja não encontrada' });
     const versions = (
@@ -139,7 +141,7 @@ router.get(
          FROM commission_rule_versions WHERE store_id=? ORDER BY effective_from DESC`,
         [row.id]
       )
-    ).map((v) => ({ ...v, rule: JSON.parse(v.rule_json), rule_json: undefined }));
+    ).map((v) => ({ ...v, rule: safeJson(v.rule_json), rule_json: undefined }));
     res.json({ store: mapStore(row), versions });
   })
 );
@@ -149,14 +151,14 @@ router.patch(
   asyncHandler(async (req, res) => {
     const row = await db.get('SELECT * FROM stores WHERE id = ? AND user_id = ?', [
       req.params.id,
-      req.user.id,
+      workspaceId(req),
     ]);
     if (!row) return res.status(404).json({ error: 'Loja não encontrada' });
 
     const before = mapStore(row);
     const { name, cnpj, color, paymentDays, ruleType, rule, active } = req.body || {};
     const nextType = ruleType || row.rule_type;
-    const nextRule = rule || JSON.parse(row.rule_json);
+    const nextRule = rule || safeJson(row.rule_json);
     const ruleChanged =
       (ruleType && ruleType !== row.rule_type) ||
       (rule && JSON.stringify(rule) !== row.rule_json);
@@ -176,7 +178,7 @@ router.patch(
         active !== undefined ? (active ? 1 : 0) : row.active,
         now,
         row.id,
-        req.user.id,
+        workspaceId(req),
       ]
     );
 
@@ -184,7 +186,7 @@ router.patch(
       await db.run(
         `INSERT INTO commission_rule_versions (id, store_id, user_id, rule_type, rule_json, effective_from, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [uuid(), row.id, req.user.id, nextType, JSON.stringify(nextRule), now.slice(0, 10), now]
+        [uuid(), row.id, workspaceId(req), nextType, JSON.stringify(nextRule), now.slice(0, 10), now]
       );
     }
 

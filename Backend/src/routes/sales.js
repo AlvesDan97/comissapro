@@ -9,6 +9,7 @@ const { DEFAULT_RULES } = require('../services/commissionEngine');
 const { mapRow, calculateEntry, resolveDueDate, usesMonthRecalc } = require('../services/commissionTypes');
 const { recalcMonthSales } = require('../services/monthLadder');
 const { workspaceId, requireLaunch, requireActiveWorkspace } = require('../services/scope');
+const { safeJson } = require('../services/safeJson');
 
 const router = express.Router();
 router.use(authRequired);
@@ -28,13 +29,13 @@ function mapSale(row) {
     grossValue: row.gross_value,
     accessoriesValue: row.accessories_value,
     extrasValue: row.extras_value,
-    nicheFields: JSON.parse(row.niche_fields || '{}'),
+    nicheFields: safeJson(row.niche_fields),
     splitEnabled: !!row.split_enabled,
     splitPartner: row.split_partner,
     splitPercent: row.split_percent,
     ruleVersionId: row.rule_version_id,
     commissionTypeId: row.commission_type_id,
-    snapshot: JSON.parse(row.snapshot_json || '{}'),
+    snapshot: safeJson(row.snapshot_json),
     commissionOfficial: row.commission_official,
     commissionExtra: row.commission_extra,
     commissionTotal: row.commission_total,
@@ -90,7 +91,7 @@ async function getRuleForDate(storeId, userId, saleDate) {
     return {
       id: version.id,
       ruleType: version.rule_type,
-      rule: JSON.parse(version.rule_json),
+      rule: safeJson(version.rule_json),
       effectiveFrom: version.effective_from,
     };
   }
@@ -99,7 +100,7 @@ async function getRuleForDate(storeId, userId, saleDate) {
   return {
     id: null,
     ruleType: store.rule_type,
-    rule: JSON.parse(store.rule_json),
+    rule: safeJson(store.rule_json),
     effectiveFrom: saleDate,
   };
 }

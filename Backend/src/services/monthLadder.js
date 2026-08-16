@@ -1,5 +1,6 @@
 const db = require('../db');
 const { calculateEntry, usesMonthRecalc, round2 } = require('./commissionTypes');
+const { safeJson } = require('./safeJson');
 
 /**
  * Recalcula a faixa do mês POR VENDEDOR (não pelo volume do time).
@@ -27,8 +28,8 @@ async function recalcMonthSales(workspaceId, type, saleDate, sellerId) {
 
   for (const sale of sales) {
     if (sale.status === 'quitada') continue;
-    const niche = JSON.parse(sale.niche_fields || '{}');
-    const snap = JSON.parse(sale.snapshot_json || '{}');
+    const niche = safeJson(sale.niche_fields);
+    const snap = safeJson(sale.snapshot_json);
     if (snap.calcType === 'flex' || snap.calcType === 'prize') continue;
     const calc = calculateEntry(type, {
       grossValue: sale.gross_value,

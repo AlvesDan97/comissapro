@@ -7,6 +7,7 @@ const { audit } = require('../services/audit');
 const { catalog, mapRow, validatePayload, usesMonthRecalc } = require('../services/commissionTypes');
 const { recalcMonthSales } = require('../services/monthLadder');
 const { workspaceId, requireManage, requireActiveWorkspace } = require('../services/scope');
+const { safeJson } = require('../services/safeJson');
 
 const router = express.Router();
 router.use(authRequired);
@@ -109,7 +110,7 @@ router.patch(
     const parsed = validatePayload({
       name: req.body?.name ?? row.name,
       calcType: req.body?.calcType ?? row.calc_type,
-      config: req.body?.config ?? JSON.parse(row.config_json || '{}'),
+      config: req.body?.config ?? safeJson(row.config_json),
       generatedWhen: req.body?.generatedWhen ?? row.generated_when,
       receiveWhen: req.body?.receiveWhen ?? row.receive_when,
       receiveDays: req.body?.receiveDays ?? row.receive_days,
@@ -118,6 +119,7 @@ router.patch(
     if (parsed.error) return res.status(400).json({ error: parsed.error });
 
     const currency = await userCurrency(ws);
+    const before = mapRow(row, currency);
     const now = new Date().toISOString();
 
     await db.run(

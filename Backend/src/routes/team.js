@@ -10,6 +10,7 @@ const { requireManage, workspaceId } = require('../services/scope');
 const { sendTemplate, appBaseUrl } = require('../services/mail');
 const { notify } = require('../services/notify');
 const { addDays } = require('../middleware/auth');
+const { safeJson } = require('../services/safeJson');
 
 const router = express.Router();
 router.use(authRequired);
@@ -237,7 +238,7 @@ router.get(
     ];
     const lines = [header.join(';')];
     for (const s of sales) {
-      const snap = JSON.parse(s.snapshot_json || '{}');
+      const snap = safeJson(s.snapshot_json);
       lines.push(
         [
           s.sale_date,

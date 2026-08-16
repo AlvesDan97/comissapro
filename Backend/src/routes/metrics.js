@@ -4,6 +4,7 @@ const db = require('../db');
 const { authRequired } = require('../middleware/auth');
 const { asyncHandler } = require('../middleware/asyncHandler');
 const { workspaceId, requireManage, sellerScope } = require('../services/scope');
+const { safeJson } = require('../services/safeJson');
 const {
   listCatalog,
   computeMetric,
@@ -34,7 +35,7 @@ router.get(
         id: r.id,
         name: r.name,
         catalogKey: r.catalog_key,
-        filters: JSON.parse(r.filters_json || '{}'),
+        filters: safeJson(r.filters_json),
         pinDashboard: !!r.pin_dashboard,
         pinCompare: !!r.pin_compare,
       })),

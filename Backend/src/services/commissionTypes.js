@@ -4,6 +4,7 @@
  */
 
 const { fifthBusinessDayNextMonth } = require('./businessDays');
+const { safeJson } = require('./safeJson');
 
 const CALC_TYPES = [
   {
@@ -245,7 +246,7 @@ function highlight(calcType, config, currency = 'BRL') {
 
 function mapRow(row, currency = 'BRL') {
   const calcType = row.calc_type;
-  let config = JSON.parse(row.config_json || '{}');
+  let config = safeJson(row.config_json);
   if (calcType === 'bands') {
     const bandBasis = inferBandBasis(config);
     config = {
@@ -334,7 +335,7 @@ function usesMonthRecalc(type) {
   const calcType = type.calcType || type.calc_type;
   const config =
     type.config ||
-    (typeof type.config_json === 'string' ? JSON.parse(type.config_json || '{}') : {});
+    (typeof type.config_json === 'string' ? safeJson(type.config_json) : {});
   if (calcType === 'flex' || calcType === 'prize' || calcType === 'percent' || calcType === 'fixed' || calcType === 'quantity') {
     return false;
   }
@@ -367,7 +368,7 @@ function calculateEntry(type, input = {}) {
   const calcType = type.calcType || type.calc_type;
   const config =
     type.config ||
-    (typeof type.config_json === 'string' ? JSON.parse(type.config_json || '{}') : {});
+    (typeof type.config_json === 'string' ? safeJson(type.config_json) : {});
   const gross = Number(input.grossValue) || 0;
   const qty = Math.max(1, Number(input.quantity) || 1);
   const cost = Number(input.costValue) || 0;

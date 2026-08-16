@@ -6,6 +6,7 @@ const { asyncHandler } = require('../middleware/asyncHandler');
 const { audit } = require('../services/audit');
 
 const { workspaceId, requirePipeline } = require('../services/scope');
+const { safeJson } = require('../services/safeJson');
 
 const router = express.Router();
 router.use(authRequired);
@@ -20,7 +21,7 @@ function mapLead(row) {
     value: row.value,
     probability: row.probability,
     stage: row.stage,
-    nicheFields: JSON.parse(row.niche_fields || '{}'),
+    nicheFields: safeJson(row.niche_fields),
     expectedClose: row.expected_close,
     notes: row.notes,
     expectedCommission: (row.value || 0) * ((row.probability || 0) / 100) * 0.004,
@@ -56,7 +57,7 @@ router.post(
         b.title,
         b.clientName || null,
         Number(b.value) || 0,
-        Number(b.probability) ?? 50,
+        Number.isFinite(Number(b.probability)) ? Number(b.probability) : 50,
         b.stage || 'lead',
         JSON.stringify(b.nicheFields || {}),
         b.expectedClose || null,
@@ -89,7 +90,9 @@ router.patch(
         b.title ?? row.title,
         b.clientName !== undefined ? b.clientName : row.client_name,
         b.value !== undefined ? Number(b.value) : row.value,
-        b.probability !== undefined ? Number(b.probability) : row.probability,
+        b.probability !== undefined && Number.isFinite(Number(b.probability))
+          ? Number(b.probability)
+          : row.probability,
         b.stage ?? row.stage,
         b.nicheFields ? JSON.stringify(b.nicheFields) : row.niche_fields,
         b.expectedClose !== undefined ? b.expectedClose : row.expected_close,
