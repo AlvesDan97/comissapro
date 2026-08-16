@@ -54,7 +54,7 @@ router.post(
       now,
       id,
     ]);
-    const link = `${appBaseUrl()}/app?confirm=${confirm}`;
+    const link = `${appBaseUrl(req)}/app?confirm=${confirm}`;
     await sendTemplate('confirm', { to: user.email, vars: { name: user.name, link } });
     await audit(id, 'CREATE', 'user', id, null, { email: user.email, plan: plan.id, needsConfirm: true });
     res.status(201).json({
@@ -106,7 +106,7 @@ router.post(
       ]);
       await sendTemplate('confirm', {
         to: user.email,
-        vars: { name: user.name, link: `${appBaseUrl()}/app?confirm=${confirm}` },
+        vars: { name: user.name, link: `${appBaseUrl(req)}/app?confirm=${confirm}` },
       });
     }
     res.json({
@@ -232,7 +232,7 @@ router.post(
         new Date().toISOString(),
         user.id,
       ]);
-      const link = `${appBaseUrl()}/app?reset=${reset}`;
+      const link = `${appBaseUrl(req)}/app?reset=${reset}`;
       await sendTemplate('reset', { to: user.email, vars: { link } });
     }
     res.json({ ok: true, message: 'Se o e-mail existir, enviamos o link de redefinição.' });
@@ -345,7 +345,7 @@ router.post(
       type: 'invite',
       title: `${name || invite.name || invite.email} entrou no espaço`,
       body: `${invite.email} aceitou o convite`,
-      link: `${appBaseUrl()}/app`,
+      link: `${appBaseUrl(req)}/app`,
     });
     res.status(201).json({ token: signToken(user), user: session, nicheFields: NICHE_FIELDS });
   })

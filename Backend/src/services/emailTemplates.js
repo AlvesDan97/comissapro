@@ -1,5 +1,40 @@
-function appBaseUrl() {
-  return (process.env.APP_URL || process.env.PUBLIC_URL || 'http://localhost:3847').replace(/\/$/, '');
+function stripSlash(s) {
+  return String(s || '').trim().replace(/\/$/, '');
+}
+
+function isLocalHost(value) {
+  return /localhost|127\.0\.0\.1|^\[::1\]/i.test(String(value || ''));
+}
+
+const PUBLIC_SITE = 'https://comiss.com.br';
+
+function appBaseUrl(req) {
+  const env = stripSlash(process.env.APP_URL || process.env.PUBLIC_URL);
+  if (env && !isLocalHost(env)) return env;
+
+  if (req && req.headers) {
+    const host = String(req.headers['x-forwarded-host'] || req.headers.host || '')
+      .split(',')[0]
+      .trim();
+    if (host && !isLocalHost(host)) {
+      const protoRaw = String(req.headers['x-forwarded-proto'] || req.protocol || 'https')
+        .split(',')[0]
+        .trim();
+      const proto = protoRaw === 'http' ? 'https' : protoRaw || 'https';
+      return `${proto}://${host}`;
+    }
+  }
+
+  const railway = stripSlash(process.env.RAILWAY_PUBLIC_DOMAIN);
+  if (railway && !isLocalHost(railway)) return `https://${railway}`;
+
+  const hosted =
+    Boolean(process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_STATIC_URL) ||
+    process.env.NODE_ENV === 'production' ||
+    Boolean(process.env.RESEND_API_KEY);
+
+  if (hosted) return PUBLIC_SITE;
+  return env || 'http://localhost:3847';
 }
 
 function esc(v) {
@@ -13,21 +48,30 @@ function esc(v) {
 function wrap({ title, preheader, body, ctaLabel, ctaUrl }) {
   const url = ctaUrl || `${appBaseUrl()}/app`;
   const html = `<!DOCTYPE html>
-<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
-<title>${esc(title)}</title></head>
-<body style="margin:0;padding:0;background:#08090A;font-family:Arial,Helvetica,sans-serif;color:#E8EAEB">
+<html lang="pt-BR"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+<title>${esc(title)}</title>
+</head>
+<body style="margin:0;padding:0;background:#F3F5F1;font-family:Arial,Helvetica,sans-serif;color:#121412;-webkit-text-size-adjust:100%;">
   <div style="display:none;max-height:0;overflow:hidden">${esc(preheader || title)}</div>
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#08090A;padding:32px 12px">
-    <tr><td align="center">
-      <table role="presentation" width="560" cellspacing="0" cellpadding="0" style="max-width:560px;background:#121416;border:1px solid #2A2E32;border-radius:16px;overflow:hidden">
-        <tr><td style="padding:28px 28px 8px;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#3FDA9A;font-weight:700">Comiss</td></tr>
-        <tr><td style="padding:8px 28px 0;font-size:22px;font-weight:800;color:#F4F6F7;line-height:1.3">${esc(title)}</td></tr>
-        <tr><td style="padding:16px 28px 8px;font-size:15px;line-height:1.6;color:#C5C9CC">${body}</td></tr>
-        <tr><td style="padding:8px 28px 28px">
-          <a href="${esc(url)}" style="display:inline-block;background:#3FDA9A;color:#06170F;text-decoration:none;font-weight:800;font-size:14px;padding:12px 18px;border-radius:999px">${esc(ctaLabel || 'Abrir o Comiss')}</a>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background:#F3F5F1;">
+    <tr><td align="center" style="padding:24px 12px;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:560px;background:#ffffff;border:1px solid #E2E6E0;border-radius:16px;">
+        <tr><td style="padding:28px 24px 8px;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#1FA971;font-weight:700">Comiss</td></tr>
+        <tr><td style="padding:8px 24px 0;font-size:22px;font-weight:800;color:#121412;line-height:1.3">${esc(title)}</td></tr>
+        <tr><td style="padding:16px 24px 8px;font-size:16px;line-height:1.6;color:#3A403C">${body}</td></tr>
+        <tr><td style="padding:12px 24px 8px">
+          <a href="${esc(url)}" style="display:inline-block;background:#3FDA9A;color:#06170F;text-decoration:none;font-weight:800;font-size:16px;padding:14px 22px;border-radius:12px">${esc(ctaLabel || 'Abrir o Comiss')}</a>
+        </td></tr>
+        <tr><td style="padding:8px 24px 28px;font-size:13px;line-height:1.5;color:#6B736E;word-break:break-all">
+          Se o botão não abrir, use este link:<br>
+          <a href="${esc(url)}" style="color:#1FA971;text-decoration:underline">${esc(url)}</a>
         </td></tr>
       </table>
-      <p style="font-size:11px;color:#6B7075;margin:16px 0 0">Você recebe este e-mail porque tem uma conta no Comiss. Cobrança da assinatura é enviada pelo Asaas.</p>
+      <p style="font-size:11px;color:#6B736E;margin:16px 12px 0;max-width:560px">Você recebe este e-mail porque tem uma conta no Comiss. Cobrança da assinatura é enviada pelo Asaas.</p>
     </td></tr>
   </table>
 </body></html>`;
@@ -142,4 +186,4 @@ function render(name, vars = {}) {
   return fn(vars);
 }
 
-module.exports = { render, wrap };
+module.exports = { render, wrap, appBaseUrl };

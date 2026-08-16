@@ -43,7 +43,7 @@ router.get(
       status: m.status,
       memberUserId: m.member_user_id,
       createdAt: m.created_at,
-      inviteLink: m.invite_token && m.status === 'pending' ? `${appBaseUrl()}/app?invite=${m.invite_token}` : null,
+      inviteLink: m.invite_token && m.status === 'pending' ? `${appBaseUrl(req)}/app?invite=${m.invite_token}` : null,
     }));
     const cap = seatCap(owner);
     res.json({
@@ -96,7 +96,7 @@ router.post(
        VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?)`,
       [id, ownerId, email.toLowerCase(), name || null, nextRole, now, inviteToken, addDays(now, 14)]
     );
-    const link = `${appBaseUrl()}/app?invite=${inviteToken}`;
+    const link = `${appBaseUrl(req)}/app?invite=${inviteToken}`;
     await sendTemplate('invite', {
       to: email.toLowerCase(),
       vars: {
@@ -111,7 +111,7 @@ router.post(
       type: 'invite',
       title: `Convite enviado para ${email.toLowerCase()}`,
       body: `Papel: ${ROLE_LABEL[nextRole] || nextRole}`,
-      link: `${appBaseUrl()}/app`,
+      link: `${appBaseUrl(req)}/app`,
     });
     const member = {
       id,
@@ -175,7 +175,7 @@ router.post(
       expires,
       row.id,
     ]);
-    const link = `${appBaseUrl()}/app?invite=${token}`;
+    const link = `${appBaseUrl(req)}/app?invite=${token}`;
     await sendTemplate('invite', {
       to: row.email,
       vars: {

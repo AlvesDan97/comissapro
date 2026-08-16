@@ -1,10 +1,34 @@
 /**
  * Envio transacional. Sem RESEND_API_KEY só registra no log (dev).
+ * Todo e-mail passa por aqui — links localhost nunca saem quando o app está no ar.
  */
-const { render } = require('./emailTemplates');
+const { render, appBaseUrl } = require('./emailTemplates');
+
+const LOCAL_ORIGIN = /https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?/gi;
+
+function rewriteLocalUrls(value) {
+  if (value == null) return value;
+  if (typeof value !== 'string') return value;
+  const base = appBaseUrl();
+  if (/localhost|127\.0\.0\.1/i.test(base)) return value;
+  return value.replace(LOCAL_ORIGIN, base);
+}
+
+function sanitizeVars(vars) {
+  const out = { ...(vars || {}) };
+  for (const key of Object.keys(out)) {
+    out[key] = rewriteLocalUrls(out[key]);
+  }
+  return out;
+}
 
 async function sendMail({ to, subject, text, html }) {
-  const payload = { to, subject, text: text || '', html: html || text };
+  const payload = {
+    to,
+    subject,
+    text: rewriteLocalUrls(text || ''),
+    html: rewriteLocalUrls(html || text),
+  };
   if (!to) return { ok: false, skipped: true };
 
   if (process.env.RESEND_API_KEY) {
@@ -35,12 +59,8 @@ async function sendMail({ to, subject, text, html }) {
 }
 
 async function sendTemplate(name, { to, vars }) {
-  const msg = render(name, vars || {});
+  const msg = render(name, sanitizeVars(vars));
   return sendMail({ to, ...msg });
-}
-
-function appBaseUrl() {
-  return (process.env.APP_URL || process.env.PUBLIC_URL || 'http://localhost:3847').replace(/\/$/, '');
 }
 
 module.exports = { sendMail, sendTemplate, appBaseUrl };

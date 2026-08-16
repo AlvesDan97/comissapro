@@ -52,7 +52,9 @@
     <div class="field"><label>Senha</label>
       <div class="pw-wrap">
         <input id="authPassword" type="password" autocomplete="current-password" placeholder="Sua senha">
-        <button type="button" class="pw-eye" data-eye="authPassword" aria-label="Mostrar senha"></button>
+        <button type="button" class="pw-eye" data-eye="authPassword" aria-label="Mostrar senha">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
       </div>
       <div id="pwRules" class="pw-rules hidden">
         <div class="pw-meter" id="pwMeter"><span></span></div>
@@ -68,7 +70,7 @@
     <div class="field hidden" id="otpField"><label>Código 2FA (OTP)</label><input id="authOtp" type="text" placeholder="123456"></div>
     <div class="biometry-row"><span>Entrar com biometria</span><button class="switch on" id="bioSwitch" type="button" aria-label="Biometria"></button></div>
     <label id="termsAcceptRow" class="biometry-row" style="margin:0 0 14px;align-items:flex-start;gap:10px;display:none">
-      <input type="checkbox" id="termsAccept" style="margin-top:3px;accent-color:var(--mint)">
+      <input type="checkbox" id="termsAccept">
       <span style="line-height:1.4">Li e aceito os <a href="/termos.html" target="_blank" style="color:var(--mint)">Termos de Uso</a> e a <a href="/privacidade.html" target="_blank" style="color:var(--mint)">Política de Privacidade</a>.</span>
     </label>
     <button class="btn-primary" id="btnAuth">Entrar</button>
@@ -82,7 +84,9 @@
       <div class="field"><label>Nova senha</label>
         <div class="pw-wrap">
           <input id="resetPassword" type="password" autocomplete="new-password" placeholder="Nova senha">
-          <button type="button" class="pw-eye" data-eye="resetPassword" aria-label="Mostrar senha"></button>
+          <button type="button" class="pw-eye" data-eye="resetPassword" aria-label="Mostrar senha">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
         </div>
         <div class="pw-rules" data-pw="resetPassword">
           <div class="pw-meter"><span></span></div>
@@ -107,7 +111,9 @@
       <div class="field"><label>Crie uma senha</label>
         <div class="pw-wrap">
           <input id="inviteJoinPassword" type="password" autocomplete="new-password" placeholder="Crie uma senha">
-          <button type="button" class="pw-eye" data-eye="inviteJoinPassword" aria-label="Mostrar senha"></button>
+          <button type="button" class="pw-eye" data-eye="inviteJoinPassword" aria-label="Mostrar senha">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
         </div>
         <div class="pw-rules" data-pw="inviteJoinPassword">
           <div class="pw-meter"><span></span></div>
