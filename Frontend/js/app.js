@@ -22,6 +22,7 @@ const state = {
   commissionDraft: null,
   commissionFormReturn: 'comissoes',
   launchCommission: null,
+  launchDate: '',
   dashScope: null,
   biPeriod: 'ytd',
   biScope: null,
@@ -67,6 +68,10 @@ const TITLES = {
 
 function fmt(n) {
   return Number(n || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+}
+function todayYmd() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 function initials(name) {
   return (name || 'U')
@@ -769,7 +774,10 @@ async function loadDashboard() {
   const data = await Api.get(`/dashboard?scope=${scope}`);
   const k = data.kpis || {};
   const monthLabel = new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-  $('dashHello').textContent = `Olá, ${firstName()}! ${data.scope === 'workspace' ? 'Visão do espaço.' : 'Toque numa comissão para lançar.'}`;
+  const emptyMonth = !k.salesCount;
+  $('dashHello').textContent = emptyMonth
+    ? `Olá, ${firstName()}! Se já vendeu este ano, lance com a data original da venda.`
+    : `Olá, ${firstName()}! ${data.scope === 'workspace' ? 'Visão do espaço.' : 'Toque numa comissão para lançar.'}`;
   $('dashMonthLabel').textContent = `Comissão · ${monthLabel}`;
   $('kpiCommission').textContent = fmt(k.commissionMonth);
   $('kpiReceived').textContent = fmt(k.commissionReceived);
@@ -893,7 +901,7 @@ async function loadDashboard() {
       </div>`
         )
         .join('')
-    : '<p class="empty">Nenhum lançamento ainda</p>';
+    : '<p class="empty">Nenhum lançamento neste mês. Vendas antigas entram pela data original no botão Lançar.</p>';
 
   state.series = data.series || [];
   const mode = state.chartMode || 'commission';
@@ -1009,6 +1017,8 @@ function launchInputs() {
     quantity: Number($('launchQty')?.value) || 1,
     costValue: Number($('launchCost')?.value) || 0,
     receiveDate: $('launchReceive')?.value || '',
+    saleDate: $('launchDate')?.value || todayYmd(),
+    alreadyReceived: !!$('launchPaid')?.checked,
     clientName: $('launchClient')?.value?.trim() || '',
     phone: $('launchPhone')?.value?.trim() || '',
     email: $('launchEmail')?.value?.trim() || '',
@@ -1020,11 +1030,31 @@ function launchInputs() {
   };
 }
 
+function syncLaunchPaidRow() {
+  const wrap = $('launchPaidWrap');
+  const hint = $('launchDateHint');
+  const date = $('launchDate')?.value || todayYmd();
+  const today = todayYmd();
+  const past = date < today;
+  if (wrap) wrap.classList.toggle('hidden', !past);
+  if (hint) {
+    hint.textContent = past
+      ? 'A comissão entra neste mês da data, não no de hoje. Faixas e meta usam o volume daquele mês.'
+      : 'Hoje. Se a venda foi antes, escolha a data original.';
+  }
+  const paid = $('launchPaid');
+  if (paid && past && !paid.dataset.touched) paid.checked = true;
+  if (paid && !past) paid.checked = false;
+}
+
+let launchPreviewTimer = null;
 function renderLaunchPreview() {
   const type = state.launchCommission;
   const box = $('launchPreview');
   if (!type || !box) return;
-  const p = CommissionUI.preview(type, launchInputs());
+  syncLaunchPaidRow();
+  const input = launchInputs();
+  const p = CommissionUI.preview(type, input);
   const receive = type.receiveLabel ? ` · recebe ${type.receiveLabel.toLowerCase()}` : '';
   const extra =
     p.monthRecalc && p.previousCount && p.monthRate != null
@@ -1033,6 +1063,28 @@ function renderLaunchPreview() {
   box.innerHTML = `<div class="lbl">Sua comissão</div>
     <div class="num">${fmt(p.amount)}</div>
     <div class="note">${p.note || ''}${receive}</div>${extra}`;
+  clearTimeout(launchPreviewTimer);
+  launchPreviewTimer = setTimeout(async () => {
+    if (state.launchCommission?.id !== type.id) return;
+    try {
+      const { preview } = await Api.post('/sales/preview', {
+        commissionTypeId: type.id,
+        saleDate: input.saleDate,
+        grossValue: input.grossValue,
+        quantity: input.quantity,
+        costValue: input.costValue,
+        commissionAmount: type.calcType === 'prize' ? input.commissionAmount : undefined,
+        flexPercent: type.calcType === 'flex' ? input.flexPercent : undefined,
+        receiveDate: input.receiveDate || undefined,
+      });
+      if (state.launchCommission?.id !== type.id) return;
+      const due = preview.dueDate ? ` · vence ${fmtDay(preview.dueDate)}` : '';
+      const nth = ` · ${preview.monthCount + 1}º no mês`;
+      box.innerHTML = `<div class="lbl">Sua comissão</div>
+        <div class="num">${fmt(preview.amount)}</div>
+        <div class="note">${preview.note || ''}${due}${nth}</div>`;
+    } catch (_) { /* preview local já está na tela */ }
+  }, 200);
 }
 
 function openLaunch(commissionId, types) {
@@ -1049,13 +1101,29 @@ function openLaunch(commissionId, types) {
     $('launchError').classList.add('hidden');
     $('launchError').textContent = '';
   }
+  if ($('launchOk')) {
+    $('launchOk').classList.add('hidden');
+    $('launchOk').textContent = '';
+  }
   const needsQty = type.calcType === 'quantity' || type.config?.per === 'unit';
   const needsCost = type.config?.appliedOn === 'margin' || type.config?.appliedOn === 'net_value';
   const needsReceive = type.receiveWhen === 'per_entry';
   const isPrize = type.calcType === 'prize';
   const isFlex = type.calcType === 'flex';
   const itemLabel = isPrize ? type.config?.itemLabel || 'Valor do item' : 'Valor';
+  const minDate = (() => {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() - 5);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  })();
+  const dateVal = state.launchDate || todayYmd();
   $('saleForm').innerHTML = `
+    <div class="field"><label>Data da venda</label>
+      <input id="launchDate" type="date" min="${minDate}" max="${todayYmd()}" value="${dateVal}">
+      <p class="field-hint" id="launchDateHint">Hoje. Se a venda foi antes, escolha a data original.</p></div>
+    <div class="field hidden" id="launchPaidWrap">
+      <label class="check-row"><input id="launchPaid" type="checkbox"> Já recebi esta comissão</label>
+      <p class="field-hint">Marque se o pagamento daquele mês já caiu. O lançamento fica quitado no relatório do período certo.</p></div>
     <div class="field"><label>${itemLabel} <span class="req">obrigatório</span></label>
       <input id="launchValue" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0" required></div>
     ${isPrize ? `<div class="field"><label>Valor da premiação <span class="req">obrigatório</span></label>
@@ -1078,10 +1146,16 @@ function openLaunch(commissionId, types) {
     ${needsReceive ? `<div class="field"><label>Quando você recebe?</label>
       <input id="launchReceive" type="date"></div>` : ''}
   `;
-  ['launchValue', 'launchQty', 'launchCost', 'launchCommission', 'launchFlex'].forEach((id) => {
+  ['launchValue', 'launchQty', 'launchCost', 'launchCommission', 'launchFlex', 'launchDate'].forEach((id) => {
     const el = $(id);
     if (el) el.addEventListener('input', renderLaunchPreview);
+    if (el) el.addEventListener('change', renderLaunchPreview);
   });
+  if ($('launchPaid')) {
+    $('launchPaid').onchange = () => {
+      $('launchPaid').dataset.touched = '1';
+    };
+  }
   renderLaunchPreview();
   const val = $('launchValue');
   show($('saleOverlay'));
@@ -1096,6 +1170,7 @@ async function saveSale() {
     err.classList.add('hidden');
     err.textContent = '';
   }
+  if ($('launchOk')) $('launchOk').classList.add('hidden');
   const input = launchInputs();
   if (type.calcType === 'prize') {
     if ($('launchValue')?.value === '') {
@@ -1126,6 +1201,8 @@ async function saveSale() {
   try {
     await Api.post('/sales', {
       commissionTypeId: type.id,
+      saleDate: input.saleDate,
+      alreadyReceived: input.saleDate < todayYmd() ? input.alreadyReceived : false,
       grossValue: input.grossValue,
       quantity: input.quantity,
       costValue: input.costValue,
@@ -1137,8 +1214,25 @@ async function saveSale() {
       notes: input.notes,
       receiveDate: input.receiveDate || undefined,
     });
-    hide($('saleOverlay'));
-    await goTo('dashboard');
+    state.launchDate = input.saleDate;
+    const retro = input.saleDate < todayYmd();
+    if (retro) {
+      const ok = $('launchOk');
+      if (ok) {
+        ok.textContent = `Lançado em ${fmtDay(input.saleDate)}. Pode registrar o próximo do mesmo mês.`;
+        ok.classList.remove('hidden');
+      }
+      ['launchValue', 'launchCommission', 'launchClient', 'launchPhone', 'launchEmail', 'launchNotes'].forEach((id) => {
+        if ($(id)) $(id).value = '';
+      });
+      if ($('launchFlex')) $('launchFlex').value = '0';
+      if ($('launchQty')) $('launchQty').value = '1';
+      renderLaunchPreview();
+      $('launchValue')?.focus();
+    } else {
+      hide($('saleOverlay'));
+      await goTo('dashboard');
+    }
   } catch (e) {
     if (err) {
       err.textContent = e.message || 'Não foi possível lançar.';
@@ -2242,7 +2336,8 @@ function wireEvents() {
   $('btnObCommissionsNext').onclick = () => {
     if (!state.commissions.length) return alert('Cadastre pelo menos uma comissão para continuar.');
     $('readyTitle').textContent = `Pronto, ${firstName()}!`;
-    $('readySub').textContent = 'Suas regras estão salvas. Agora você entra em Minhas Comissões — pode editar e adicionar outras quando quiser.';
+    $('readySub').textContent =
+      'Suas regras estão salvas. No Painel, lance pela comissão. Se já vendeu neste ano, coloque a data original — a faixa é a daquele mês e você marca se já recebeu.';
     showWizard('wizardReady');
   };
   $('btnFinishOnboarding').onclick = async () => {

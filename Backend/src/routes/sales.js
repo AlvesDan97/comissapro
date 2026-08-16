@@ -15,6 +15,26 @@ const router = express.Router();
 router.use(authRequired);
 router.use(requireActiveWorkspace);
 
+function ymdUtcShift(days) {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function parseSaleDate(raw) {
+  const fallback = new Date().toISOString().slice(0, 10);
+  if (!raw) return fallback;
+  const s = String(raw).slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  const t = new Date(`${s}T12:00:00Z`);
+  if (Number.isNaN(t.getTime())) return null;
+  const min = ymdUtcShift(-365 * 5);
+  const max = ymdUtcShift(1);
+  if (s < min) return null;
+  if (s > max) return null;
+  return s;
+}
+
 function mapSale(row) {
   return {
     id: row.id,
@@ -274,7 +294,8 @@ router.post(
     const body = req.body || {};
     const type = await loadCommissionType(workspaceId(req), body.commissionTypeId);
     if (!type) return res.status(400).json({ error: 'Selecione uma comissão.' });
-    const saleDate = body.saleDate || new Date().toISOString().slice(0, 10);
+    const saleDate = parseSaleDate(body.saleDate);
+    if (!saleDate) return res.status(400).json({ error: 'Data do lançamento inválida.' });
     const stats = await monthStatsForType(workspaceId(req), type.id, saleDate, req.user.id);
     const calc = calculateEntry(type, {
       grossValue: body.grossValue,
@@ -309,7 +330,8 @@ router.post(
     if (body.commissionTypeId) {
       const type = await loadCommissionType(ws, body.commissionTypeId);
       if (!type) return res.status(400).json({ error: 'Selecione uma comissão.' });
-      const saleDate = body.saleDate || new Date().toISOString().slice(0, 10);
+      const saleDate = parseSaleDate(body.saleDate);
+      if (!saleDate) return res.status(400).json({ error: 'Data do lançamento inválida. Use a data original da venda, até hoje.' });
       if (type.receiveWhen === 'per_entry' && !body.receiveDate) {
         return res.status(400).json({ error: 'Informe quando você recebe esta comissão.' });
       }
@@ -352,6 +374,20 @@ router.post(
         flexPercent: Number(body.flexPercent) || 0,
       };
 
+      const today = ymdUtcShift(0);
+      const alreadyReceived = !!body.alreadyReceived;
+      const dueStr = resolveDueDate(type, saleDate, body.receiveDate);
+      let saleStatus = 'pendente';
+      let recStatus = 'previsto';
+      let paidDate = null;
+      if (alreadyReceived) {
+        saleStatus = 'quitada';
+        recStatus = 'quitado';
+        paidDate = dueStr <= today ? dueStr : today;
+      } else if (dueStr < today) {
+        recStatus = 'atrasado';
+      }
+
       await db.run(
         `INSERT INTO sales (
           id, user_id, store_id, lead_id, title, client_name, status, sale_date,
@@ -366,7 +402,7 @@ router.post(
           body.leadId || null,
           title,
           body.clientName || null,
-          'pendente',
+          saleStatus,
           saleDate,
           Number(body.grossValue) || 0,
           JSON.stringify(nicheFields),
@@ -382,15 +418,17 @@ router.post(
       );
 
       const saleRow = await db.get('SELECT * FROM sales WHERE id=?', [id]);
-      const dueStr = resolveDueDate(type, saleDate, body.receiveDate);
       const recNow = new Date().toISOString();
       await db.run(
-        `INSERT INTO receivables (id, sale_id, user_id, label, amount, kind, due_date, status, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, 'oficial', ?, 'previsto', ?, ?)`,
-        [uuid(), id, ws, type.name, calc.amount, dueStr, recNow, recNow]
+        `INSERT INTO receivables (id, sale_id, user_id, label, amount, kind, due_date, paid_date, status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, 'oficial', ?, ?, ?, ?, ?)`,
+        [uuid(), id, ws, type.name, calc.amount, dueStr, paidDate, recStatus, recNow, recNow]
       );
 
-      await recalcMonthSales(ws, type, saleDate, req.user.id);
+      const thisMonth = today.slice(0, 7);
+      await recalcMonthSales(ws, type, saleDate, req.user.id, {
+        includePaid: alreadyReceived || saleDate.slice(0, 7) < thisMonth,
+      });
 
       const refreshed = await db.get('SELECT * FROM sales WHERE id=?', [id]);
       const sale = mapSale(refreshed || saleRow);

@@ -5,11 +5,12 @@ const { safeJson } = require('./safeJson');
 /**
  * Recalcula a faixa do mês POR VENDEDOR (não pelo volume do time).
  */
-async function recalcMonthSales(workspaceId, type, saleDate, sellerId) {
+async function recalcMonthSales(workspaceId, type, saleDate, sellerId, opts = {}) {
   if (!type || !usesMonthRecalc(type)) return { updated: 0, monthCount: 0 };
   const calcType = type.calcType || type.calc_type;
   if (calcType === 'flex' || calcType === 'prize') return { updated: 0, monthCount: 0 };
   if (!sellerId) return { updated: 0, monthCount: 0 };
+  const includePaid = !!opts.includePaid;
 
   const month = (saleDate || new Date().toISOString()).slice(0, 7);
   const sales = await db.all(
@@ -25,9 +26,12 @@ async function recalcMonthSales(workspaceId, type, saleDate, sellerId) {
   const now = new Date().toISOString();
   let updated = 0;
   let bandLabel = '';
+  const recFilter = includePaid
+    ? `status IN ('previsto','parcial','atrasado','quitado')`
+    : `status IN ('previsto','parcial','atrasado')`;
 
   for (const sale of sales) {
-    if (sale.status === 'quitada') continue;
+    if (!includePaid && sale.status === 'quitada') continue;
     const niche = safeJson(sale.niche_fields);
     const snap = safeJson(sale.snapshot_json);
     if (snap.calcType === 'flex' || snap.calcType === 'prize') continue;
@@ -62,7 +66,7 @@ async function recalcMonthSales(workspaceId, type, saleDate, sellerId) {
     );
     await db.run(
       `UPDATE receivables SET amount=?, updated_at=?
-       WHERE sale_id=? AND kind='oficial' AND status IN ('previsto','parcial','atrasado')`,
+       WHERE sale_id=? AND kind='oficial' AND ${recFilter}`,
       [nextOfficial, now, sale.id]
     );
     updated += 1;
