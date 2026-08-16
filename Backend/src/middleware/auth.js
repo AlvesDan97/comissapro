@@ -106,6 +106,7 @@ function authRequired(req, res, next) {
   db.get('SELECT * FROM users WHERE id=?', [payload.sub])
     .then((row) => {
       if (!row) return res.status(401).json({ error: 'Usuário não encontrado' });
+      if (row.blocked_at) return res.status(403).json({ error: 'Esta conta foi bloqueada.' });
       return buildSession(row).then((session) => {
         req.user = session;
         next();

@@ -60,6 +60,9 @@ router.post(
     if (!user || !bcrypt.compareSync(password || '', user.password_hash)) {
       return res.status(401).json({ error: 'Credenciais inválidas' });
     }
+    if (user.blocked_at) {
+      return res.status(403).json({ error: 'Esta conta foi bloqueada. Fale com o suporte Comiss.' });
+    }
     if (user.twofa_enabled) {
       const ok = otp === '123456' || otp === user.twofa_secret;
       if (!ok) {

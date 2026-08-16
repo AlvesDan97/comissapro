@@ -297,8 +297,61 @@ async function migrate() {
   await ensureColumn('team_members', 'invite_token', 'invite_token TEXT');
   await ensureColumn('team_members', 'invite_expires_at', 'invite_expires_at TEXT');
   await ensureColumn('users', 'notify_prefs_json', "notify_prefs_json TEXT DEFAULT '{}'");
+  await ensureColumn('users', 'blocked_at', 'blocked_at TEXT');
+  await ensureColumn('users', 'blocked_reason', 'blocked_reason TEXT');
+  await exec(`
+    CREATE TABLE IF NOT EXISTS admin_users (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      name TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'owner',
+      active INTEGER DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      last_login_at TEXT
+    )
+  `);
+  await exec(`
+    CREATE TABLE IF NOT EXISTS admin_audit_logs (
+      id TEXT PRIMARY KEY,
+      admin_id TEXT NOT NULL,
+      action TEXT NOT NULL,
+      entity TEXT NOT NULL,
+      entity_id TEXT,
+      before_json TEXT,
+      after_json TEXT,
+      ip TEXT,
+      created_at TEXT NOT NULL
+    )
+  `);
+  await exec(`
+    CREATE TABLE IF NOT EXISTS account_notes (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      admin_id TEXT,
+      body TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    )
+  `);
+  await exec(`CREATE INDEX IF NOT EXISTS idx_admin_audit ON admin_audit_logs(created_at)`);
+  await exec(`CREATE INDEX IF NOT EXISTS idx_account_notes_user ON account_notes(user_id)`);
 
   const goalType = usePostgres ? 'DOUBLE PRECISION' : 'REAL';
+  await exec(`
+    CREATE TABLE IF NOT EXISTS coupons (
+      id TEXT PRIMARY KEY,
+      code TEXT NOT NULL UNIQUE,
+      kind TEXT NOT NULL DEFAULT 'percent',
+      value ${goalType} NOT NULL DEFAULT 0,
+      max_redemptions INTEGER,
+      redeemed INTEGER DEFAULT 0,
+      plans_json TEXT DEFAULT '[]',
+      expires_at TEXT,
+      active INTEGER DEFAULT 1,
+      created_at TEXT NOT NULL
+    )
+  `);
   await exec(`
     CREATE TABLE IF NOT EXISTS goals (
       id TEXT PRIMARY KEY,

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="theme-color" content="#08090A">
+<title>Comiss — Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+<div id="login">
+  <div class="card">
+    <div class="brand">Comiss · interno</div>
+    <h1>Portal do operador</h1>
+    <p class="sub">Acesso privado. Clientes não entram aqui.</p>
+    <div id="loginError" class="error hidden"></div>
+    <label>E-mail<input id="email" type="email" autocomplete="username"></label>
+    <label>Senha<input id="password" type="password" autocomplete="current-password"></label>
+    <button type="button" class="btn" id="btnLogin">Entrar</button>
+  </div>
+</div>
+
+<div id="shell" class="hidden">
+  <aside>
+    <div class="brand">Comiss admin</div>
+    <button class="nav on" data-screen="dashboard">Painel</button>
+    <button class="nav" data-screen="accounts">Contas</button>
+    <button class="nav" data-screen="subscriptions">Assinaturas</button>
+    <button class="nav" data-screen="plans">Planos</button>
+    <button class="nav" data-screen="coupons">Cupons</button>
+    <button class="nav" data-screen="leads">Leads</button>
+    <button class="nav" data-screen="audit">Auditoria</button>
+    <button class="nav" data-screen="ops">Operação</button>
+    <button class="logout" id="btnLogout" type="button">Sair</button>
+  </aside>
+  <main>
+    <header>
+      <h2 id="pageTitle">Painel</h2>
+      <span id="who"></span>
+    </header>
+
+    <section class="screen on" id="screen-dashboard">
+      <div class="kpis" id="kpis"></div>
+      <div class="grid2">
+        <div class="card" id="byStatus"></div>
+        <div class="card" id="byPlan"></div>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-accounts">
+      <div class="toolbar">
+        <input id="accQ" placeholder="Buscar e-mail, nome, empresa">
+        <select id="accPlan"><option value="">Todos os planos</option><option value="solo">Solo</option><option value="pro">Pro</option><option value="time">Time</option></select>
+        <select id="accStatus">
+          <option value="">Todos os status</option>
+          <option value="trialing">Trial</option>
+          <option value="active">Ativo</option>
+          <option value="overdue">Inadimplente</option>
+          <option value="canceled">Cancelado</option>
+          <option value="expired">Expirado</option>
+        </select>
+        <button class="btn ghost" type="button" id="btnAccSearch">Filtrar</button>
+      </div>
+      <div id="accList"></div>
+    </section>
+
+    <section class="screen" id="screen-account">
+      <button class="link" type="button" data-screen="accounts">← Contas</button>
+      <div id="accDetail"></div>
+    </section>
+
+    <section class="screen" id="screen-subscriptions">
+      <div id="subList"></div>
+    </section>
+
+    <section class="screen" id="screen-plans">
+      <div id="planList"></div>
+    </section>
+
+    <section class="screen" id="screen-coupons">
+      <div class="card">
+        <h3>Novo cupom</h3>
+        <div class="row">
+          <input id="cpCode" placeholder="CODIGO">
+          <select id="cpKind"><option value="percent">%</option><option value="fixed">R$</option></select>
+          <input id="cpValue" type="number" placeholder="Valor">
+          <button class="btn" type="button" id="btnCoupon">Criar</button>
+        </div>
+        <p class="hint">Estrutura pronta. A cobrança Asaas ainda não aplica o cupom automaticamente.</p>
+      </div>
+      <div id="couponList"></div>
+    </section>
+
+    <section class="screen" id="screen-leads">
+      <p class="hint">Pipeline lançado pelos clientes no app (não é CRM do site).</p>
+      <div id="leadList"></div>
+    </section>
+
+    <section class="screen" id="screen-audit">
+      <div id="auditList"></div>
+    </section>
+
+    <section class="screen" id="screen-ops">
+      <div id="opsBox"></div>
+    </section>
+  </main>
+</div>
+<script src="js/admin.js"></script>
+</body>
+</html>

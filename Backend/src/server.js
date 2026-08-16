@@ -72,7 +72,7 @@ app.get('/api/health', async (_req, res) => {
     res.json({
       ok: true,
       name: 'Comiss API',
-      version: '1.2.0',
+      version: '1.3.0',
       db: db.usePostgres ? 'postgres' : 'sqlite',
       time: new Date().toISOString(),
     });
@@ -86,6 +86,7 @@ app.use('/api/auth/register', loginLimiter);
 app.use('/api/auth/forgot', loginLimiter);
 app.use('/api/auth/reset', loginLimiter);
 app.use('/api/auth/accept-invite', loginLimiter);
+app.use('/api/admin/login', loginLimiter);
 app.use('/api', apiLimiter);
 
 app.use('/api/auth', authRoutes);
@@ -100,6 +101,7 @@ app.use('/api/commissions', commissionRoutes);
 app.use('/api/goals', require('./routes/goals'));
 app.use('/api/metrics', require('./routes/metrics'));
 app.use('/api/inbox', require('./routes/inbox'));
+app.use('/api/admin', require('./routes/admin'));
 
 app.use('/api', (req, res) => {
   res.status(404).json({ error: `Rota não encontrada: ${req.method} ${req.originalUrl}` });
@@ -113,6 +115,11 @@ app.get('/', (_req, res) => {
 
 app.get(['/app', '/app.html'], (_req, res) => {
   res.sendFile(path.join(frontendPath, 'app.html'));
+});
+
+app.get(['/admin', '/admin.html'], (_req, res) => {
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
+  res.sendFile(path.join(frontendPath, 'admin.html'));
 });
 
 const legalPages = {
@@ -159,6 +166,8 @@ async function start() {
   }
 
   const info = await db.init();
+  const { bootstrapAdmin } = require('./services/adminBootstrap');
+  await bootstrapAdmin();
   await new Promise((resolve, reject) => {
     const server = app.listen(PORT, '0.0.0.0', () => {
       console.log(`Comiss listening on 0.0.0.0:${PORT}`);
