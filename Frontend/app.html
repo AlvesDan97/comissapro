@@ -167,6 +167,7 @@
       <button class="nav-item" data-screen="perfil"><span class="ico">👤</span>Perfil</button>
       <button class="nav-item" data-screen="equipe" data-nav="equipe"><span class="ico">☺</span>Equipe</button>
       <button class="nav-item" data-screen="planos" data-nav="planos"><span class="ico">◆</span>Planos e cobrança</button>
+      <button class="nav-item" data-screen="ajuda"><span class="ico">?</span>Ajuda <span class="bell-badge hidden" id="helpBadge">0</span></button>
       <button class="nav-item" data-screen="config"><span class="ico">⚙</span>Configurações</button>
       <a href="/" style="display:block;margin:12px 10px 0;font-size:12px;color:var(--text-faint);text-decoration:none">← Site Comiss</a>
       <div class="sidebar-foot">
@@ -407,6 +408,18 @@
           </div>
         </div>
         <div class="stores-grid" id="plansAppGrid"></div>
+      </section>
+
+      <!-- AJUDA -->
+      <section class="screen" id="screen-ajuda">
+        <p class="screen-lead">Fale com a Comiss daqui. A resposta chega neste fio e no e-mail.</p>
+        <div class="filter-row" id="helpTabs">
+          <button class="chip active" type="button" data-help="list">Conversas</button>
+          <button class="chip" type="button" data-help="support">Novo pedido</button>
+          <button class="chip" type="button" data-help="suggestion">Sugestão</button>
+          <button class="chip" type="button" data-help="rating">Avaliar</button>
+        </div>
+        <div id="helpPanel"></div>
       </section>
 
       <!-- CONFIG -->

@@ -43,6 +43,9 @@ function showShell() {
 
 const TITLES = {
   dashboard: 'Painel',
+  revenue: 'Receita',
+  inbox: 'Inbox',
+  ticket: 'Conversa',
   accounts: 'Contas',
   account: 'Conta',
   subscriptions: 'Assinaturas',
@@ -53,12 +56,40 @@ const TITLES = {
   ops: 'Operação',
 };
 
+function setInboxBadge(n) {
+  const el = $('inboxNavBadge');
+  if (!el) return;
+  const c = Number(n) || 0;
+  el.textContent = c > 99 ? '99+' : String(c);
+  el.classList.toggle('hidden', c === 0);
+}
+
+function barsHtml(items, valueKey) {
+  const max = Math.max(1, ...items.map((i) => Number(i[valueKey]) || 0));
+  return `<div class="bars">${items
+    .map((i) => {
+      const v = Number(i[valueKey]) || 0;
+      const h = Math.max(v ? 6 : 2, Math.round((v / max) * 100));
+      return `<div class="bar-col" title="${esc(i.label)}: ${v}"><div class="bar" style="height:${h}%"></div><span>${esc(i.label)}</span></div>`;
+    })
+    .join('')}</div>`;
+}
+
 async function go(name) {
   document.querySelectorAll('.screen').forEach((s) => s.classList.remove('on'));
   $(`screen-${name}`).classList.add('on');
-  document.querySelectorAll('.nav').forEach((b) => b.classList.toggle('on', b.dataset.screen === name || (name === 'account' && b.dataset.screen === 'accounts')));
+  document.querySelectorAll('.nav').forEach((b) =>
+    b.classList.toggle(
+      'on',
+      b.dataset.screen === name ||
+        (name === 'account' && b.dataset.screen === 'accounts') ||
+        (name === 'ticket' && b.dataset.screen === 'inbox')
+    )
+  );
   $('pageTitle').textContent = TITLES[name] || name;
   if (name === 'dashboard') await loadDash();
+  if (name === 'revenue') await loadRevenue();
+  if (name === 'inbox') await loadInbox();
   if (name === 'accounts') await loadAccounts();
   if (name === 'subscriptions') await loadSubs();
   if (name === 'plans') await loadPlans();
@@ -71,11 +102,14 @@ async function go(name) {
 async function loadDash() {
   const d = await api('/dashboard');
   const k = d.kpis;
+  setInboxBadge(k.inboxUnread);
   $('kpis').innerHTML = [
     ['Contas', k.accounts],
     ['Membros', k.members],
     ['Trials', k.trials],
     ['MRR', fmt(k.mrr)],
+    ['Inbox', k.inboxUnread],
+    ['Aguardando vocês', k.inboxWaiting],
     ['Hoje', k.newToday],
     ['7 dias', k.newWeek],
     ['Vendas no mês', k.salesMonth],
@@ -85,6 +119,124 @@ async function loadDash() {
     .join('');
   $('byStatus').innerHTML = `<h3>Status</h3>` + Object.entries(d.byStatus || {}).map(([k, v]) => `<p>${esc(k)} · <b>${v}</b></p>`).join('') || '<p class="hint">Nenhuma conta ainda.</p>';
   $('byPlan').innerHTML = `<h3>Planos</h3>` + Object.entries(d.byPlan || {}).map(([k, v]) => `<p>${esc(k)} · <b>${v}</b></p>`).join('') || '<p class="hint">—</p>';
+}
+
+async function loadRevenue() {
+  const d = await api('/revenue');
+  const k = d.kpis;
+  $('revNote').textContent = d.note || '';
+  $('revKpis').innerHTML = [
+    ['MRR', fmt(k.mrr)],
+    ['ARR', fmt(k.arr)],
+    ['Pagantes', k.paying],
+    ['Trials', k.trials],
+    ['Inadimplentes', k.overdue],
+    ['Cancelados', k.canceled],
+    ['Assentos extra', k.extraSeats],
+    ['MRR extra', fmt(k.extraMrr)],
+  ]
+    .map(([lbl, val]) => `<div class="kpi"><div class="lbl">${lbl}</div><div class="val">${val}</div></div>`)
+    .join('');
+  $('revSignups').innerHTML = barsHtml(d.signups || [], 'accounts');
+  const maxMix = Math.max(1, ...(d.mix || []).map((m) => m.mrr));
+  $('revMix').innerHTML = (d.mix || [])
+    .map(
+      (m) => `<div class="mix-row"><span style="width:64px">${esc(m.name)}</span>
+        <div class="mix-track"><div class="mix-fill" style="width:${Math.round((m.mrr / maxMix) * 100)}%"></div></div>
+        <span class="mono">${fmt(m.mrr)} · ${m.paying} pagantes</span></div>`
+    )
+    .join('') || '<p class="hint">Sem MRR ainda.</p>';
+  const c = d.cycle || {};
+  $('revCycle').innerHTML = `<h3>Ciclo</h3>
+    <p>Mensal · ${c.monthly?.accounts || 0} contas · <b>${fmt(c.monthly?.mrr)}</b></p>
+    <p>Anual · ${c.yearly?.accounts || 0} contas · <b>${fmt(c.yearly?.mrr)}</b></p>`;
+  const w = d.waterfall || {};
+  $('revWater').innerHTML = `<h3>Neste mês</h3>
+    <p>MRR de contas novas ativas · <b>${fmt(w.newMrr)}</b></p>
+    <p>Mês passado (novas ainda ativas) · <b>${fmt(w.lastMonthNewMrr)}</b></p>
+    <p>Assentos extra · <b>${fmt(w.extraMrr)}</b></p>
+    <p>Inadimplência em risco · <b>${fmt(w.overdueAtRisk)}</b></p>`;
+}
+
+const KIND_LABEL = { support: 'Suporte', suggestion: 'Sugestão', rating: 'Avaliação' };
+
+async function loadInbox() {
+  const kind = $('inKind').value;
+  const status = $('inStatus').value;
+  const q = encodeURIComponent($('inQ').value || '');
+  const data = await api(`/inbox?kind=${kind}&status=${status}&q=${q}`);
+  setInboxBadge(data.stats?.unread);
+  if (!data.tickets.length) {
+    $('inboxList').innerHTML = '<p class="hint">Nada nesta fila.</p>';
+    return;
+  }
+  $('inboxList').innerHTML = `<table class="table"><thead><tr><th>Cliente</th><th>Tipo</th><th>Assunto</th><th>Status</th><th></th></tr></thead><tbody>
+    ${data.tickets
+      .map(
+        (t) => `<tr>
+      <td>${esc(t.userName || '—')}<div class="hint">${esc(t.userEmail || '')}</div></td>
+      <td>${esc(KIND_LABEL[t.kind] || t.kind)}${t.rating ? ` · ${t.rating}/5` : ''}</td>
+      <td>${t.unreadForAdmin ? '<b>' : ''}${esc(t.subject)}${t.unreadForAdmin ? '</b>' : ''}</td>
+      <td>${tag(t.status)}</td>
+      <td><button class="link" data-tid="${t.id}">abrir</button></td>
+    </tr>`
+      )
+      .join('')}
+  </tbody></table>`;
+  $('inboxList').querySelectorAll('[data-tid]').forEach((b) => {
+    b.onclick = () => openTicket(b.dataset.tid);
+  });
+}
+
+async function openTicket(id) {
+  document.querySelectorAll('.screen').forEach((s) => s.classList.remove('on'));
+  $('screen-ticket').classList.add('on');
+  document.querySelectorAll('.nav').forEach((b) => b.classList.toggle('on', b.dataset.screen === 'inbox'));
+  $('pageTitle').textContent = 'Conversa';
+  const d = await api(`/inbox/${id}`);
+  const t = d.ticket;
+  const sug = t.kind === 'suggestion';
+  const statuses = sug
+    ? [['received', 'Recebida'], ['planned', 'Planejada'], ['shipped', 'Lançada'], ['declined', 'Recusada']]
+    : [['open', 'Aberto'], ['in_progress', 'Em atendimento'], ['waiting_user', 'Aguardando cliente'], ['waiting_staff', 'Aguardando Comiss'], ['resolved', 'Resolvido']];
+  $('ticketDetail').innerHTML = `
+    <div class="card">
+      <h3>${esc(KIND_LABEL[t.kind] || t.kind)} · ${esc(t.subject)} ${tag(t.status)}</h3>
+      <p class="hint">${esc(t.userName || '')} · ${esc(t.userEmail || '')} · ${esc(t.plan || '')} · ${esc(t.planStatus || '')}</p>
+      ${t.rating ? `<p>Nota ${t.rating}/5</p>` : ''}
+      <div class="thread">
+        ${(d.messages || [])
+          .map(
+            (m) => `<div class="bubble ${m.authorType === 'admin' ? 'admin' : ''}">
+              <div class="who">${esc(m.authorName)} · ${new Date(m.createdAt).toLocaleString('pt-BR')}</div>
+              <div>${esc(m.body)}</div>
+            </div>`
+          )
+          .join('')}
+      </div>
+      ${
+        t.kind !== 'rating'
+          ? `<div class="row"><textarea id="replyBody" placeholder="Responder ao cliente"></textarea></div>
+             <div class="actions"><button class="btn small" type="button" id="btnReply">Enviar resposta</button></div>`
+          : ''
+      }
+      <div class="actions" style="margin-top:10px">
+        <select id="ticketStatus">${statuses.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select>
+        <button class="btn small ghost" type="button" id="btnTicketStatus">Atualizar status</button>
+      </div>
+    </div>`;
+  $('ticketStatus').value = t.status;
+  const reply = $('btnReply');
+  if (reply) {
+    reply.onclick = async () => {
+      await api(`/inbox/${id}/reply`, { method: 'POST', body: { body: $('replyBody').value } });
+      openTicket(id);
+    };
+  }
+  $('btnTicketStatus').onclick = async () => {
+    await api(`/inbox/${id}/status`, { method: 'POST', body: { status: $('ticketStatus').value } });
+    openTicket(id);
+  };
 }
 
 async function loadAccounts() {
@@ -209,14 +361,49 @@ async function loadSubs() {
 }
 
 async function loadPlans() {
-  const { plans } = await api('/plans');
-  $('planList').innerHTML = plans
-    .map(
-      (p) => `<div class="card"><h3>${esc(p.name)} · ${fmt(p.priceMonthly)}/mês</h3>
-      <p class="hint">${esc(p.tagline)}</p>
-      <p>${(p.features || []).map((f) => esc(f)).join(' · ')}</p></div>`
-    )
-    .join('');
+  const { plans, note } = await api('/plans');
+  $('planList').innerHTML =
+    `<p class="hint">${esc(note || '')}</p>` +
+    plans
+      .map(
+        (p) => `<form class="card" data-plan="${esc(p.id)}">
+      <h3>${esc(p.name)} <span class="hint">(${esc(p.id)})</span></h3>
+      <label>Nome<input name="name" value="${esc(p.name)}"></label>
+      <label>Tagline<input name="tagline" value="${esc(p.tagline || '')}"></label>
+      <div class="row">
+        <label>Mensal (R$)<input name="priceMonthly" type="number" min="1" step="0.01" value="${p.priceMonthly}"></label>
+        <label>Anual (R$)<input name="priceYearly" type="number" min="1" step="0.01" value="${p.priceYearly}"></label>
+        <label>Assento extra<input name="extraSeatPrice" type="number" min="0" step="0.01" value="${p.extraSeatPrice || ''}" placeholder="—"></label>
+      </div>
+      <div class="row">
+        <label>Limite lojas<input name="maxStores" type="number" min="0" value="${p.maxStores}"></label>
+        <label>Usuários inclusos<input name="maxTeamMembers" type="number" min="0" value="${p.maxTeamMembers}"></label>
+      </div>
+      <label>Features (uma por linha)<textarea name="features">${esc((p.features || []).join('\n'))}</textarea></label>
+      <button class="btn small" type="submit">Salvar ${esc(p.name)}</button>
+    </form>`
+      )
+      .join('');
+  $('planList').querySelectorAll('form[data-plan]').forEach((form) => {
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      await api(`/plans/${form.dataset.plan}`, {
+        method: 'PATCH',
+        body: {
+          name: fd.get('name'),
+          tagline: fd.get('tagline'),
+          priceMonthly: Number(fd.get('priceMonthly')),
+          priceYearly: Number(fd.get('priceYearly')),
+          extraSeatPrice: fd.get('extraSeatPrice') === '' ? null : Number(fd.get('extraSeatPrice')),
+          maxStores: Number(fd.get('maxStores')),
+          maxTeamMembers: Number(fd.get('maxTeamMembers')),
+          features: String(fd.get('features') || ''),
+        },
+      });
+      await loadPlans();
+    };
+  });
 }
 
 async function loadCoupons() {
@@ -291,6 +478,7 @@ async function boot() {
     if (e.key === 'Enter') $('btnLogin').click();
   });
   $('btnAccSearch').onclick = loadAccounts;
+  if ($('btnInboxSearch')) $('btnInboxSearch').onclick = loadInbox;
   $('btnCoupon').onclick = async () => {
     await api('/coupons', {
       method: 'POST',

@@ -72,7 +72,7 @@ app.get('/api/health', async (_req, res) => {
     res.json({
       ok: true,
       name: 'Comiss API',
-      version: '1.3.0',
+      version: '1.4.0',
       db: db.usePostgres ? 'postgres' : 'sqlite',
       time: new Date().toISOString(),
     });
@@ -103,6 +103,7 @@ app.use('/api/commissions', commissionRoutes);
 app.use('/api/goals', require('./routes/goals'));
 app.use('/api/metrics', require('./routes/metrics'));
 app.use('/api/inbox', require('./routes/inbox'));
+app.use('/api/support', require('./routes/support'));
 app.use('/api/admin', require('./routes/admin'));
 
 app.use('/api', (req, res) => {
@@ -168,6 +169,8 @@ async function start() {
   }
 
   const info = await db.init();
+  const { loadFromDb } = require('./services/plans');
+  await loadFromDb();
   const { bootstrapAdmin } = require('./services/adminBootstrap');
   await bootstrapAdmin();
   await new Promise((resolve, reject) => {

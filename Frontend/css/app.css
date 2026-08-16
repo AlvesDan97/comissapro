@@ -351,6 +351,18 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:17px;heigh
 .bell-btn{position:relative}
 .bell-badge{position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;padding:0 4px;border-radius:99px;background:var(--mint);color:#06170F;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;line-height:1}
 .bell-badge.hidden{display:none !important}
+.nav-item .bell-badge{position:static;display:inline-flex;margin-left:6px;vertical-align:middle}
+.nav-item .bell-badge.hidden{display:none !important}
+.ticket-row{width:100%;text-align:left;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-md);padding:12px 14px;margin-bottom:8px;color:var(--text)}
+.ticket-row b{display:block;font-size:13.5px}
+.ticket-row .hint{font-size:12px;color:var(--text-dim);margin-top:4px}
+.help-thread{display:flex;flex-direction:column;gap:10px;margin:12px 0 16px}
+.help-bubble{padding:10px 12px;border-radius:12px;background:var(--bg-elev);border:1px solid var(--border);max-width:92%}
+.help-bubble.admin{border-color:rgba(63,218,154,.4);align-self:flex-end}
+.help-bubble .who{font-size:11px;color:var(--text-dim);margin-bottom:4px}
+.star-pick{display:flex;gap:6px;margin:8px 0 14px}
+.star-pick button{background:none;border:none;font-size:26px;color:var(--text-faint);padding:0}
+.star-pick button.on{color:var(--amber)}
 .inbox-actions{display:flex;gap:14px;margin:0 0 12px}
 .notify-row{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;padding:12px 0;border:none;border-bottom:1px solid var(--border-soft);background:none;color:var(--text)}
 .notify-row.unread .notify-title{color:var(--mint)}

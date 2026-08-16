@@ -56,6 +56,7 @@ const TITLES = {
   equipe: 'Equipe',
   pendencias: 'Pendências',
       planos: 'Planos e cobrança',
+  ajuda: 'Ajuda',
   config: 'Configurações',
 };
 
@@ -222,7 +223,8 @@ async function enterApp(startScreen) {
   show($('app'));
   applyUserChrome();
   await Promise.all([refreshStores(), loadCommissionCatalog()]);
-  await goTo(startScreen || 'dashboard');
+  const fromUrl = urlParams.get('screen');
+  await goTo(startScreen || fromUrl || 'dashboard');
   flushOfflineQueue();
   startInboxPoll();
 }
@@ -284,7 +286,14 @@ async function goTo(name) {
   });
   $('pageTitle').textContent = TITLES[name] || name;
   window.scrollTo({ top: 0, behavior: 'smooth' });
-  const hideFab = name === 'comissao-form' || name === 'perfil' || name === 'comissoes' || name === 'dashboard';
+  const hideFab =
+    name === 'comissao-form' ||
+    name === 'perfil' ||
+    name === 'comissoes' ||
+    name === 'dashboard' ||
+    name === 'ajuda' ||
+    name === 'config' ||
+    name === 'planos';
   if ($('fabNewSale')) $('fabNewSale').classList.toggle('hidden', hideFab);
 
   if (name === 'dashboard') await loadDashboard();
@@ -298,6 +307,7 @@ async function goTo(name) {
   if (name === 'comparar') await loadCompare();
   if (name === 'planos') await loadPlansScreen();
   if (name === 'pendencias') await loadPendencias();
+  if (name === 'ajuda') await loadAjuda();
   if (name === 'config') {
     applyUserChrome();
     await loadNotifyPrefs();
@@ -315,6 +325,15 @@ async function refreshInboxBadge() {
     badge.textContent = n > 99 ? '99+' : String(n);
     badge.classList.toggle('hidden', n === 0);
   } catch (_) { /* sessão expirada */ }
+  try {
+    const s = await Api.get('/support/unread');
+    const h = Number(s.unread) || 0;
+    const help = $('helpBadge');
+    if (help) {
+      help.textContent = h > 99 ? '99+' : String(h);
+      help.classList.toggle('hidden', h === 0);
+    }
+  } catch (_) { /* ignore */ }
 }
 function startInboxPoll() {
   refreshInboxBadge();
@@ -339,9 +358,11 @@ async function openInbox() {
       .join('');
     list.querySelectorAll('[data-nid]').forEach((btn) => {
       btn.onclick = async () => {
+        const item = data.notifications.find((x) => x.id === btn.dataset.nid);
         await Api.post(`/inbox/notifications/${btn.dataset.nid}/read`, {});
         hide($('inboxOverlay'));
-        await goTo('pendencias');
+        if ((item?.link || '').includes('ajuda') || item?.type === 'support') await goTo('ajuda');
+        else await goTo('pendencias');
         refreshInboxBadge();
       };
     });
@@ -376,6 +397,7 @@ async function loadPendencias() {
   });
   refreshInboxBadge();
 }
+
 async function loadNotifyPrefs() {
   try {
     const { prefs } = await Api.get('/inbox/prefs');
@@ -1555,6 +1577,189 @@ async function loadPlansScreen() {
   });
 }
 
+const HELP_KIND = { support: 'Suporte', suggestion: 'Sugestão', rating: 'Avaliação' };
+const helpState = { tab: 'list', ticketId: null, rating: 5 };
+
+function helpStatusLabel(t) {
+  const map = {
+    open: 'Aberto',
+    in_progress: 'Em atendimento',
+    waiting_user: 'Aguardando você',
+    waiting_staff: 'Aguardando a Comiss',
+    resolved: 'Resolvido',
+    received: 'Recebida',
+    planned: 'Planejada',
+    shipped: 'Lançada',
+    declined: 'Não vamos seguir',
+  };
+  return map[t.status] || t.status;
+}
+
+async function loadAjuda() {
+  const panel = $('helpPanel');
+  if (!panel) return;
+  document.querySelectorAll('#helpTabs .chip').forEach((c) => c.classList.toggle('active', c.dataset.help === helpState.tab));
+  if (helpState.ticketId) {
+    await renderHelpThread(helpState.ticketId);
+    return;
+  }
+  if (helpState.tab === 'list') {
+    const data = await Api.get('/support');
+    if (!data.tickets?.length) {
+      panel.innerHTML = '<p class="empty">Nenhuma conversa ainda. Abra um pedido, uma sugestão ou deixe uma nota.</p>';
+      return;
+    }
+    panel.innerHTML = data.tickets
+      .map(
+        (t) => `<button class="ticket-row" type="button" data-open-ticket="${t.id}">
+          <b>${escHtml(HELP_KIND[t.kind] || t.kind)} · ${escHtml(t.subject)}</b>
+          <div class="hint">${escHtml(helpStatusLabel(t))}${t.unreadForUser ? ' · nova resposta' : ''}${t.rating ? ` · ${t.rating}/5` : ''}</div>
+        </button>`
+      )
+      .join('');
+    panel.querySelectorAll('[data-open-ticket]').forEach((b) => {
+      b.onclick = () => {
+        helpState.ticketId = b.dataset.openTicket;
+        loadAjuda();
+      };
+    });
+    return;
+  }
+  if (helpState.tab === 'rating') {
+    panel.innerHTML = `
+      <div class="settings-card">
+        <p class="screen-lead" style="margin-top:0">Como está sendo usar o Comiss?</p>
+        <div class="star-pick" id="starPick">${[1, 2, 3, 4, 5]
+          .map((n) => `<button type="button" data-star="${n}" class="${n <= helpState.rating ? 'on' : ''}">★</button>`)
+          .join('')}</div>
+        <div class="field"><label>Comentário (opcional)</label><textarea id="helpBody" placeholder="O que está bom ou o que falta"></textarea></div>
+        <button class="btn-primary" type="button" id="btnHelpSend">Enviar avaliação</button>
+      </div>`;
+    panel.querySelectorAll('[data-star]').forEach((b) => {
+      b.onclick = () => {
+        helpState.rating = Number(b.dataset.star);
+        panel.querySelectorAll('[data-star]').forEach((x) =>
+          x.classList.toggle('on', Number(x.dataset.star) <= helpState.rating)
+        );
+      };
+    });
+    $('btnHelpSend').onclick = () => sendHelp('rating');
+    return;
+  }
+  const isSug = helpState.tab === 'suggestion';
+  panel.innerHTML = `
+    <div class="settings-card">
+      ${
+        isSug
+          ? ''
+          : `<div class="field"><label>Assunto</label>
+        <select id="helpCat">
+          <option value="problema">Algo não funciona</option>
+          <option value="duvida">Dúvida de uso</option>
+          <option value="cobranca">Cobrança / plano</option>
+          <option value="acesso">Não consigo entrar</option>
+        </select></div>
+        <div class="field"><label>Título</label><input id="helpSubject" placeholder="Ex.: não aparece a comissão do mês"></div>`
+      }
+      <div class="field"><label>${isSug ? 'Sua ideia' : 'Detalhe'}</label>
+        <textarea id="helpBody" placeholder="${isSug ? 'O que você gostaria que o Comiss fizesse' : 'O que aconteceu, o que você esperava'}"></textarea></div>
+      <button class="btn-primary" type="button" id="btnHelpSend">${isSug ? 'Enviar sugestão' : 'Enviar pedido'}</button>
+    </div>`;
+  $('btnHelpSend').onclick = () => sendHelp(isSug ? 'suggestion' : 'support');
+}
+
+async function sendHelp(kind) {
+  try {
+    const cat = $('helpCat')?.value;
+    await Api.post('/support', {
+      kind,
+      category: kind === 'suggestion' ? 'ideia' : kind === 'rating' ? 'avaliacao' : cat,
+      subject: $('helpSubject')?.value || (kind === 'suggestion' ? 'Sugestão' : ''),
+      body: $('helpBody')?.value || (kind === 'rating' ? `Nota ${helpState.rating}/5` : ''),
+      rating: kind === 'rating' ? helpState.rating : undefined,
+    });
+    helpState.tab = 'list';
+    helpState.ticketId = null;
+    await loadAjuda();
+    refreshInboxBadge();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function renderHelpThread(id) {
+  const panel = $('helpPanel');
+  const data = await Api.get(`/support/${id}`);
+  const t = data.ticket;
+  panel.innerHTML = `
+    <button class="back-link" type="button" id="helpBack">← Conversas</button>
+    <div class="settings-card">
+      <div class="section-title" style="margin-top:0">${escHtml(HELP_KIND[t.kind] || t.kind)} · ${escHtml(t.subject)}</div>
+      <p class="screen-lead">${escHtml(helpStatusLabel(t))}${t.rating ? ` · nota ${t.rating}/5` : ''}</p>
+      <div class="help-thread">
+        ${(data.messages || [])
+          .map(
+            (m) => `<div class="help-bubble ${m.authorType === 'admin' ? 'admin' : ''}">
+              <div class="who">${escHtml(m.authorName)} · ${new Date(m.createdAt).toLocaleString('pt-BR')}</div>
+              <div>${escHtml(m.body)}</div>
+            </div>`
+          )
+          .join('')}
+      </div>
+      ${
+        t.kind !== 'rating'
+          ? `<div class="field"><label>Responder</label><textarea id="helpReply" placeholder="Escreva aqui"></textarea></div>
+             <button class="btn-primary" type="button" id="btnHelpReply">Enviar</button>`
+          : ''
+      }
+      ${
+        t.kind === 'support' && t.status === 'resolved' && !t.rating
+          ? `<p class="screen-lead">Como foi o atendimento?</p>
+             <div class="star-pick" id="csatPick">${[1, 2, 3, 4, 5].map((n) => `<button type="button" data-csat="${n}">★</button>`).join('')}</div>`
+          : ''
+      }
+    </div>`;
+  $('helpBack').onclick = () => {
+    helpState.ticketId = null;
+    helpState.tab = 'list';
+    loadAjuda();
+  };
+  const reply = $('btnHelpReply');
+  if (reply) {
+    reply.onclick = async () => {
+      try {
+        await Api.post(`/support/${id}/messages`, { body: $('helpReply').value });
+        await renderHelpThread(id);
+        refreshInboxBadge();
+      } catch (err) {
+        alert(err.message);
+      }
+    };
+  }
+  panel.querySelectorAll('[data-csat]').forEach((b) => {
+    b.onclick = async () => {
+      await Api.post(`/support/${id}/rate`, { rating: Number(b.dataset.csat) });
+      await renderHelpThread(id);
+    };
+  });
+}
+
+async function fillPlanPick() {
+  const wrap = $('planPick');
+  if (!wrap) return;
+  try {
+    const data = await fetch('/api/billing/plans').then((r) => r.json());
+    if (!data.plans?.length) return;
+    wrap.innerHTML = data.plans
+      .map(
+        (p) =>
+          `<button type="button" data-plan="${escHtml(p.id)}"><strong>${escHtml(p.name)}</strong><small>R$ ${p.priceMonthly}/mês</small></button>`
+      )
+      .join('');
+    syncPlanPickUi();
+  } catch (_) { /* fallback HTML */ }
+}
+
 /* ---------- Boot / Events ---------- */
 function wireEvents() {
   $('btnStart').onclick = () => {
@@ -1564,12 +1769,14 @@ function wireEvents() {
   };
   $('btnAuth').onclick = doAuth;
   $('authToggle').onclick = () => setAuthMode(state.mode === 'login' ? 'register' : 'login');
-  document.querySelectorAll('#planPick [data-plan]').forEach((b) => {
-    b.onclick = () => {
+  if ($('planPick')) {
+    $('planPick').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-plan]');
+      if (!b) return;
       state.selectedPlanId = b.dataset.plan;
       syncPlanPickUi();
-    };
-  });
+    });
+  }
   const regCycle = $('regCycle');
   if (regCycle) {
     regCycle.querySelectorAll('button').forEach((b) => {
@@ -1655,6 +1862,13 @@ function wireEvents() {
 
   document.querySelectorAll('.nav-item, .bn-item').forEach((btn) => {
     btn.addEventListener('click', () => goTo(btn.dataset.screen));
+  });
+  document.querySelectorAll('#helpTabs .chip').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      helpState.tab = btn.dataset.help;
+      helpState.ticketId = null;
+      loadAjuda();
+    });
   });
   document.querySelectorAll('[data-go]').forEach((btn) => {
     btn.addEventListener('click', () => goTo(btn.dataset.go));
@@ -1871,6 +2085,7 @@ function wireEvents() {
 
 async function boot() {
   wireEvents();
+  fillPlanPick();
 
   if (urlParams.get('confirm')) {
     $('splash').classList.add('hide');

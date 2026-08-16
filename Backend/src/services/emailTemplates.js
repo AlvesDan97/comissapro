@@ -123,6 +123,17 @@ const TEMPLATES = {
       ctaUrl: v.link,
     }),
   }),
+  supportReply: (v) => ({
+    subject: `Comiss respondeu: ${v.subject || 'sua conversa'}`,
+    text: `Olá${v.name ? `, ${v.name}` : ''}. Resposta sobre "${v.subject || 'sua conversa'}": ${v.body || ''} ${v.link}`,
+    html: wrap({
+      title: 'Nova resposta da Comiss',
+      preheader: v.subject,
+      body: `<p style="margin:0 0 12px">Olá${v.name ? `, <strong>${esc(v.name)}</strong>` : ''}. Respondemos sobre <strong>${esc(v.subject || 'sua conversa')}</strong>.</p><p style="margin:0">${esc(v.body || '')}</p>`,
+      ctaLabel: 'Abrir no app',
+      ctaUrl: v.link,
+    }),
+  }),
 };
 
 function render(name, vars = {}) {

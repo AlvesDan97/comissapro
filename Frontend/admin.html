@@ -27,6 +27,8 @@
   <aside>
     <div class="brand">Comiss admin</div>
     <button class="nav on" data-screen="dashboard">Painel</button>
+    <button class="nav" data-screen="revenue">Receita</button>
+    <button class="nav" data-screen="inbox">Inbox <span class="nav-badge hidden" id="inboxNavBadge">0</span></button>
     <button class="nav" data-screen="accounts">Contas</button>
     <button class="nav" data-screen="subscriptions">Assinaturas</button>
     <button class="nav" data-screen="plans">Planos</button>
@@ -48,6 +50,55 @@
         <div class="card" id="byStatus"></div>
         <div class="card" id="byPlan"></div>
       </div>
+    </section>
+
+    <section class="screen" id="screen-revenue">
+      <p class="hint" id="revNote"></p>
+      <div class="kpis" id="revKpis"></div>
+      <div class="grid2">
+        <div class="card">
+          <h3>Contas novas (12 meses)</h3>
+          <div id="revSignups"></div>
+        </div>
+        <div class="card">
+          <h3>MRR por plano</h3>
+          <div id="revMix"></div>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="card" id="revCycle"></div>
+        <div class="card" id="revWater"></div>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-inbox">
+      <div class="toolbar">
+        <select id="inKind">
+          <option value="">Todos</option>
+          <option value="support">Suporte</option>
+          <option value="suggestion">Sugestões</option>
+          <option value="rating">Avaliações</option>
+        </select>
+        <select id="inStatus">
+          <option value="">Qualquer status</option>
+          <option value="open">Aberto</option>
+          <option value="waiting_staff">Aguardando Comiss</option>
+          <option value="waiting_user">Aguardando cliente</option>
+          <option value="in_progress">Em atendimento</option>
+          <option value="resolved">Resolvido</option>
+          <option value="received">Recebida</option>
+          <option value="planned">Planejada</option>
+          <option value="shipped">Lançada</option>
+        </select>
+        <input id="inQ" placeholder="Buscar texto ou e-mail">
+        <button class="btn ghost" type="button" id="btnInboxSearch">Filtrar</button>
+      </div>
+      <div id="inboxList"></div>
+    </section>
+
+    <section class="screen" id="screen-ticket">
+      <button class="link" type="button" data-screen="inbox">← Inbox</button>
+      <div id="ticketDetail"></div>
     </section>
 
     <section class="screen" id="screen-accounts">

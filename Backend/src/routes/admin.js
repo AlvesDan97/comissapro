@@ -13,7 +13,8 @@ const {
   clientIp,
 } = require('../middleware/adminAuth');
 const { adminAudit } = require('../services/adminAudit');
-const { listPlans, getPlan, planLimits } = require('../services/plans');
+const support = require('../services/supportTickets');
+const { listPlans, getPlan, planLimits, planMrr, updatePlan } = require('../services/plans');
 
 const router = express.Router();
 
@@ -21,14 +22,8 @@ function money(n) {
   return Number(n || 0);
 }
 
-function planMrr(row) {
-  if (row.plan_status !== 'active') return 0;
-  const plan = getPlan(row.plan || 'solo');
-  if (!plan) return 0;
-  const extra = Number(row.extra_seats) || 0;
-  const extraMonth = extra * (plan.extraSeatPrice || 0);
-  if (row.billing_cycle === 'yearly') return plan.priceYearly / 12 + extraMonth;
-  return plan.priceMonthly + extraMonth;
+function monthKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
 router.post(
@@ -107,6 +102,7 @@ router.get(
       `SELECT COUNT(*) as c FROM users WHERE id = workspace_id AND substr(created_at,1,10)=?`,
       [today]
     );
+    const inbox = await support.stats();
     res.json({
       kpis: {
         accounts: owners.length,
@@ -119,9 +115,12 @@ router.get(
         commissionAll: money(sales?.comm),
         newToday: Number(newToday?.c) || 0,
         newWeek: Number(newWeek?.c) || 0,
+        inboxUnread: inbox.unread,
+        inboxWaiting: inbox.waitingStaff,
       },
       byStatus,
       byPlan,
+      inbox,
     });
   })
 );
@@ -383,8 +382,182 @@ router.get(
 );
 
 router.get('/plans', (_req, res) => {
-  res.json({ plans: listPlans() });
+  res.json({
+    plans: listPlans(),
+    note: 'Preço novo vale para cadastro e novas assinaturas. Quem já paga no Asaas permanece no valor da assinatura até migrar.',
+  });
 });
+
+router.patch(
+  '/plans/:id',
+  asyncHandler(async (req, res) => {
+    try {
+      const { before, after } = await updatePlan(req.params.id, { ...(req.body || {}), adminId: req.admin?.id });
+      await adminAudit(req, 'PLAN_PRICE', 'plan', after.id, before, after);
+      res.json({ ok: true, plan: after, before });
+    } catch (err) {
+      return res.status(err.status || 400).json({ error: err.message });
+    }
+  })
+);
+
+router.get(
+  '/revenue',
+  asyncHandler(async (req, res) => {
+    const owners = await db.all(`SELECT * FROM users WHERE id = workspace_id`);
+    const mixMap = {};
+    const cycle = { monthly: { accounts: 0, mrr: 0 }, yearly: { accounts: 0, mrr: 0 } };
+    let mrr = 0;
+    let trials = 0;
+    let overdue = 0;
+    let canceled = 0;
+    let extraSeats = 0;
+    let extraMrr = 0;
+    for (const o of owners) {
+      const planId = o.plan || 'solo';
+      const plan = getPlan(planId);
+      const value = planMrr(o);
+      mrr += value;
+      if (!mixMap[planId]) mixMap[planId] = { id: planId, name: plan?.name || planId, accounts: 0, paying: 0, mrr: 0 };
+      mixMap[planId].accounts += 1;
+      mixMap[planId].mrr += value;
+      if (o.plan_status === 'active') mixMap[planId].paying += 1;
+      const cyc = o.billing_cycle === 'yearly' ? 'yearly' : 'monthly';
+      cycle[cyc].accounts += 1;
+      cycle[cyc].mrr += value;
+      if (o.plan_status === 'trialing') trials += 1;
+      if (o.plan_status === 'overdue') overdue += 1;
+      if (o.plan_status === 'canceled' || o.plan_status === 'expired') canceled += 1;
+      extraSeats += Number(o.extra_seats) || 0;
+      extraMrr += (Number(o.extra_seats) || 0) * (plan?.extraSeatPrice || 0) * (o.plan_status === 'active' ? 1 : 0);
+    }
+    const mix = Object.values(mixMap).map((row) => ({
+      ...row,
+      mrr: Math.round(row.mrr * 100) / 100,
+      pct: mrr ? Math.round((row.mrr / mrr) * 1000) / 10 : 0,
+    }));
+
+    const signups = [];
+    const now = new Date();
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = monthKey(d);
+      const inMonth = owners.filter((o) => String(o.created_at || '').slice(0, 7) === key);
+      signups.push({
+        month: key,
+        label: d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', ''),
+        accounts: inMonth.length,
+        mrrNow: Math.round(inMonth.reduce((s, o) => s + planMrr(o), 0) * 100) / 100,
+      });
+    }
+
+    const thisMonth = monthKey(now);
+    const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonth = monthKey(lastMonthDate);
+    const newMrr = owners
+      .filter((o) => String(o.created_at || '').slice(0, 7) === thisMonth && o.plan_status === 'active')
+      .reduce((s, o) => s + planMrr(o), 0);
+    const lastNew = owners
+      .filter((o) => String(o.created_at || '').slice(0, 7) === lastMonth && o.plan_status === 'active')
+      .reduce((s, o) => s + planMrr(o), 0);
+
+    res.json({
+      kpis: {
+        mrr: Math.round(mrr * 100) / 100,
+        arr: Math.round(mrr * 12 * 100) / 100,
+        paying: owners.filter((o) => o.plan_status === 'active').length,
+        accounts: owners.length,
+        trials,
+        overdue,
+        canceled,
+        extraSeats,
+        extraMrr: Math.round(extraMrr * 100) / 100,
+      },
+      mix,
+      cycle: {
+        monthly: { ...cycle.monthly, mrr: Math.round(cycle.monthly.mrr * 100) / 100 },
+        yearly: { ...cycle.yearly, mrr: Math.round(cycle.yearly.mrr * 100) / 100 },
+      },
+      signups,
+      waterfall: {
+        newMrr: Math.round(newMrr * 100) / 100,
+        lastMonthNewMrr: Math.round(lastNew * 100) / 100,
+        extraMrr: Math.round(extraMrr * 100) / 100,
+        overdueAtRisk: Math.round(
+          owners.filter((o) => o.plan_status === 'overdue').reduce((s, o) => {
+            const p = getPlan(o.plan || 'solo');
+            if (!p) return s;
+            const extra = (Number(o.extra_seats) || 0) * (p.extraSeatPrice || 0);
+            return s + (o.billing_cycle === 'yearly' ? p.priceYearly / 12 : p.priceMonthly) + extra;
+          }, 0) * 100
+        ) / 100,
+      },
+      note: 'MRR usa o catálogo atual nas contas ativas. Assinaturas Asaas antigas podem ter outro valor até a migração.',
+    });
+  })
+);
+
+router.get(
+  '/inbox',
+  asyncHandler(async (req, res) => {
+    const tickets = await support.listForAdmin({
+      kind: req.query.kind || '',
+      status: req.query.status || '',
+      q: req.query.q || '',
+    });
+    res.json({ tickets, stats: await support.stats() });
+  })
+);
+
+router.get(
+  '/inbox/:id',
+  asyncHandler(async (req, res) => {
+    const ticket = await support.getTicket(req.params.id);
+    if (!ticket) return res.status(404).json({ error: 'Ticket não encontrado' });
+    await support.markRead(ticket, 'admin');
+    const messages = await support.messages(ticket.id);
+    res.json({
+      ticket: support.publicTicket(ticket, {
+        plan: ticket.plan,
+        planStatus: ticket.plan_status,
+        company: ticket.company,
+      }),
+      messages,
+    });
+  })
+);
+
+router.post(
+  '/inbox/:id/reply',
+  asyncHandler(async (req, res) => {
+    const ticket = await support.getTicket(req.params.id);
+    if (!ticket) return res.status(404).json({ error: 'Ticket não encontrado' });
+    try {
+      await support.replyAsAdmin(ticket, req.admin, req.body?.body);
+    } catch (err) {
+      return res.status(err.status || 400).json({ error: err.message });
+    }
+    await adminAudit(req, 'REPLY', 'ticket', ticket.id, null, { preview: String(req.body?.body || '').slice(0, 80) });
+    const next = await support.getTicket(ticket.id);
+    res.json({ ok: true, ticket: support.publicTicket(next), messages: await support.messages(ticket.id) });
+  })
+);
+
+router.post(
+  '/inbox/:id/status',
+  asyncHandler(async (req, res) => {
+    const ticket = await support.getTicket(req.params.id);
+    if (!ticket) return res.status(404).json({ error: 'Ticket não encontrado' });
+    try {
+      await support.setStatus(ticket.id, req.body?.status, ticket.kind);
+    } catch (err) {
+      return res.status(err.status || 400).json({ error: err.message });
+    }
+    await adminAudit(req, 'TICKET_STATUS', 'ticket', ticket.id, { status: ticket.status }, { status: req.body?.status });
+    const next = await support.getTicket(ticket.id);
+    res.json({ ok: true, ticket: support.publicTicket(next) });
+  })
+);
 
 router.get(
   '/coupons',

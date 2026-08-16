@@ -422,6 +422,69 @@ async function migrate() {
   await exec(`CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at)`);
   await exec(`CREATE INDEX IF NOT EXISTS idx_followups_ws ON followups(workspace_id, status)`);
 
+  const moneyType = usePostgres ? 'DOUBLE PRECISION' : 'REAL';
+  await exec(`
+    CREATE TABLE IF NOT EXISTS plan_catalog (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      tagline TEXT,
+      price_monthly ${moneyType} NOT NULL,
+      price_yearly ${moneyType} NOT NULL,
+      currency TEXT DEFAULT 'BRL',
+      max_stores INTEGER DEFAULT 0,
+      max_team_members INTEGER DEFAULT 0,
+      extra_seat_price ${moneyType},
+      features_json TEXT DEFAULT '[]',
+      highlighted INTEGER DEFAULT 0,
+      sort_order INTEGER DEFAULT 0,
+      updated_at TEXT NOT NULL
+    )
+  `);
+  await exec(`
+    CREATE TABLE IF NOT EXISTS plan_price_history (
+      id TEXT PRIMARY KEY,
+      plan_id TEXT NOT NULL,
+      admin_id TEXT,
+      before_json TEXT,
+      after_json TEXT,
+      created_at TEXT NOT NULL
+    )
+  `);
+  await exec(`
+    CREATE TABLE IF NOT EXISTS support_tickets (
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      category TEXT,
+      subject TEXT NOT NULL,
+      body TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'open',
+      rating INTEGER,
+      assigned_admin_id TEXT,
+      last_author_type TEXT,
+      user_read_at TEXT,
+      admin_read_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      resolved_at TEXT
+    )
+  `);
+  await exec(`
+    CREATE TABLE IF NOT EXISTS support_messages (
+      id TEXT PRIMARY KEY,
+      ticket_id TEXT NOT NULL,
+      author_type TEXT NOT NULL,
+      author_id TEXT,
+      body TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    )
+  `);
+  await exec(`CREATE INDEX IF NOT EXISTS idx_support_ws ON support_tickets(workspace_id, created_at)`);
+  await exec(`CREATE INDEX IF NOT EXISTS idx_support_status ON support_tickets(status, kind)`);
+  await exec(`CREATE INDEX IF NOT EXISTS idx_support_msgs ON support_messages(ticket_id, created_at)`);
+  await ensureColumn('support_messages', 'author_name', 'author_name TEXT');
+
   await exec(`UPDATE users SET workspace_id = id WHERE workspace_id IS NULL OR workspace_id = ''`);
   await exec(`UPDATE users SET workspace_role = 'owner' WHERE workspace_id = id AND (workspace_role IS NULL OR workspace_role = '')`);
   await exec(`UPDATE sales SET seller_id = user_id WHERE seller_id IS NULL OR seller_id = ''`);

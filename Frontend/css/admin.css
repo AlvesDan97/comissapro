@@ -24,6 +24,22 @@ aside .brand{padding:0 8px 16px}
 .nav,.logout{border:none;background:none;color:var(--dim);text-align:left;padding:9px 10px;border-radius:8px;font:inherit;cursor:pointer}
 .nav.on,.nav:hover{background:rgba(63,218,154,.12);color:var(--text)}
 .logout{margin-top:auto;color:var(--red)}
+.nav-badge{display:inline-block;min-width:18px;padding:1px 6px;margin-left:6px;border-radius:99px;background:var(--red);color:#fff;font-size:10px;font-weight:800}
+.nav-badge.hidden{display:none!important}
+.bars{display:flex;align-items:flex-end;gap:6px;height:140px;padding-top:8px}
+.bar-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:6px;min-width:0}
+.bar-col .bar{width:100%;max-width:28px;background:var(--mint);border-radius:4px 4px 0 0;min-height:2px}
+.bar-col span{font-size:10px;color:var(--dim);text-transform:capitalize;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.mix-row{display:flex;align-items:center;gap:10px;margin:8px 0}
+.mix-track{flex:1;height:8px;background:#0c0d0e;border-radius:99px;overflow:hidden}
+.mix-fill{height:100%;background:var(--mint);border-radius:99px}
+.thread{display:flex;flex-direction:column;gap:10px;margin:12px 0;max-height:360px;overflow:auto}
+.bubble{padding:10px 12px;border-radius:12px;background:#0c0d0e;border:1px solid var(--border);max-width:90%}
+.bubble.admin{border-color:rgba(63,218,154,.35);align-self:flex-end}
+.bubble .who{font-size:11px;color:var(--dim);margin-bottom:4px}
+.stars button{background:none;border:none;color:var(--dim);font-size:22px;padding:0 2px;cursor:pointer}
+.stars button.on{color:var(--amber)}
+textarea{min-height:90px;resize:vertical}
 main{flex:1;padding:22px 28px;overflow:auto}
 header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
 header h2{margin:0;font-size:20px}
