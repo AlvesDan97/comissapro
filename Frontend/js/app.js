@@ -1502,8 +1502,6 @@ function wireEvents() {
     });
   }
   $('bioSwitch').onclick = function () { this.classList.toggle('on'); };
-  $('btnGoogle').onclick = () => toast('Login social Google: conecte OAuth em produção. Use e-mail/senha na demo.', true);
-  $('btnApple').onclick = () => toast('Login social Apple: conecte OAuth em produção. Use e-mail/senha na demo.', true);
 
   $('btnProfileNext').onclick = async () => {
     try {
