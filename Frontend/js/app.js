@@ -23,6 +23,10 @@ const state = {
   commissionFormReturn: 'comissoes',
   launchCommission: null,
   dashScope: null,
+  biPeriod: 'ytd',
+  biScope: null,
+  biSellerId: '',
+  biChartMode: 'commission',
   metricCatalog: [],
 };
 
@@ -53,6 +57,7 @@ const TITLES = {
   simulador: 'Simulador',
   metas: 'Metas',
   comparar: 'Comparar',
+  bi: 'Relatórios',
   equipe: 'Equipe',
   pendencias: 'Pendências',
       planos: 'Planos e cobrança',
@@ -298,6 +303,9 @@ async function enterApp(startScreen) {
   $('splash').classList.add('hide');
   show($('app'));
   applyUserChrome();
+  state.biSellerId = '';
+  state.biPeriod = 'ytd';
+  if ($('biSeller')) delete $('biSeller').dataset.loaded;
   await Promise.all([refreshStores(), loadCommissionCatalog()]);
   const fromUrl = urlParams.get('screen');
   await goTo(startScreen || fromUrl || 'dashboard');
@@ -367,6 +375,7 @@ async function goTo(name) {
     name === 'perfil' ||
     name === 'comissoes' ||
     name === 'dashboard' ||
+    name === 'bi' ||
     name === 'ajuda' ||
     name === 'config' ||
     name === 'planos';
@@ -374,6 +383,7 @@ async function goTo(name) {
 
   try {
     if (name === 'dashboard') await loadDashboard();
+    if (name === 'bi') await loadBi();
     if (name === 'comissoes') await loadCommissionsScreen();
     if (name === 'perfil') loadProfileScreen();
     if (name === 'vendas') await loadSales();
@@ -884,6 +894,21 @@ async function loadDashboard() {
         )
         .join('')
     : '<p class="empty">Nenhum lançamento ainda</p>';
+
+  state.series = data.series || [];
+  const mode = state.chartMode || 'commission';
+  document.querySelectorAll('#dashChartToggle [data-mode]').forEach((b) => {
+    b.classList.toggle('on', b.dataset.mode === mode);
+    b.onclick = () => {
+      state.chartMode = b.dataset.mode;
+      drawSeriesChart('dashChart', 'dashChartAxis', state.series, state.chartMode);
+      document.querySelectorAll('#dashChartToggle [data-mode]').forEach((x) =>
+        x.classList.toggle('on', x.dataset.mode === state.chartMode)
+      );
+    };
+  });
+  drawSeriesChart('dashChart', 'dashChartAxis', state.series, mode);
+  if ($('dashGoBi')) $('dashGoBi').onclick = () => goTo('bi');
 }
 
 function fmtDay(isoDate) {
@@ -1125,29 +1150,332 @@ async function saveSale() {
   }
 }
 
+function fmtChart(n, mode) {
+  if (mode === 'count') return String(Math.round(Number(n) || 0));
+  const v = Number(n) || 0;
+  const sign = v < 0 ? '-' : '';
+  const abs = Math.abs(v);
+  if (abs >= 1000000) {
+    const x = abs / 1000000;
+    const s = (x >= 10 ? x.toFixed(0) : x.toFixed(1)).replace('.', ',');
+    return sign + s + ' mi';
+  }
+  if (abs >= 1000) return sign + Math.round(abs / 1000).toLocaleString('pt-BR') + ' mil';
+  return sign + Math.round(abs).toLocaleString('pt-BR');
+}
+
+function chartUnit(mode) {
+  if (mode === 'count') return 'Quantidade';
+  if (mode === 'revenue') return 'Vendas (R$)';
+  return 'Comissão (R$)';
+}
+
 function drawSeriesChart(svgId, axisId, series, mode) {
   const svg = $(svgId);
-  const pts = series.map((s) => (mode === 'revenue' ? s.revenue || s.total || 0 : s.commission || s.total || 0));
+  if (!svg) return;
+  const rows = series || [];
+  const pts = rows.map((s) => {
+    if (mode === 'revenue') return Number(s.revenue || s.total) || 0;
+    if (mode === 'count') return Number(s.count || s.launches) || 0;
+    return Number(s.commission || s.total) || 0;
+  });
+  const axis = $(axisId);
+  if (axis) axis.innerHTML = '';
   if (!pts.length) {
     svg.innerHTML = '';
-    $(axisId).innerHTML = '';
     return;
   }
-  const w = 600, h = 160, pad = 8;
-  const max = Math.max(...pts, 1), min = Math.min(...pts, 0);
-  const stepX = (w - pad * 2) / Math.max(pts.length - 1, 1);
-  const coords = pts.map((v, i) => {
-    const x = pad + i * stepX;
-    const y = h - pad - ((v - min) / (max - min || 1)) * (h - pad * 2);
-    return [x, y];
-  });
+
+  const w = 640;
+  const h = 228;
+  const padL = 58;
+  const padR = 28;
+  const padT = 44;
+  const padB = 32;
+  const plotW = w - padL - padR;
+  const plotH = h - padT - padB;
+  const max = Math.max(...pts, 1);
+  const n = pts.length;
+  const stepX = plotW / Math.max(n - 1, 1);
+  const yOf = (v) => padT + plotH - (v / max) * plotH;
+  const coords = pts.map((v, i) => [padL + i * stepX, yOf(v), v]);
+
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+  const ticks = [0, max / 2, max];
+  const grid = ticks
+    .map((t) => {
+      const y = yOf(t);
+      return `<line class="bi-grid" x1="${padL}" y1="${y}" x2="${w - padR}" y2="${y}"/>
+        <text class="bi-ax" x="${padL - 8}" y="${y + 3.5}" text-anchor="end">${escHtml(fmtChart(t, mode))}</text>`;
+    })
+    .join('');
+
   const line = coords.map((p, i) => `${i ? 'L' : 'M'}${p[0]},${p[1]}`).join(' ');
-  const area = `${line} L${coords[coords.length - 1][0]},${h} L${coords[0][0]},${h} Z`;
+  const area = `${line} L${coords[n - 1][0]},${padT + plotH} L${coords[0][0]},${padT + plotH} Z`;
+  const showAllPts = n <= 8;
+  const maxIdx = pts.reduce((best, v, i) => (v >= pts[best] ? i : best), 0);
+  const showPt = (i) => showAllPts || i === 0 || i === n - 1 || i === maxIdx || i % 2 === 0;
+
+  const dots = coords
+    .map((p, i) => {
+      const label = showPt(i)
+        ? `<text class="bi-pt" x="${p[0]}" y="${p[1] - (i % 2 === 0 ? 10 : 18)}" text-anchor="middle">${escHtml(fmtChart(p[2], mode))}</text>`
+        : '';
+      return `<circle cx="${p[0]}" cy="${p[1]}" r="3.2" fill="#3FDA9A"/>${label}`;
+    })
+    .join('');
+
+  const showX = (i) => n <= 9 || i === 0 || i === n - 1 || i % 2 === 0;
+  const xLabels = coords
+    .map((p, i) => {
+      if (!showX(i)) return '';
+      const lab = rows[i].label || rows[i].month?.slice(5) || '';
+      return `<text class="bi-ax" x="${p[0]}" y="${h - 10}" text-anchor="middle">${escHtml(lab)}</text>`;
+    })
+    .join('');
+
   svg.innerHTML = `<defs><linearGradient id="g${svgId}" x1="0" y1="0" x2="0" y2="1">
     <stop offset="0%" stop-color="#3FDA9A" stop-opacity=".28"/><stop offset="100%" stop-color="#3FDA9A" stop-opacity="0"/></linearGradient></defs>
-    <path d="${area}" fill="url(#g${svgId})"/><path d="${line}" fill="none" stroke="#3FDA9A" stroke-width="2.2" stroke-linecap="round"/>
-    <circle cx="${coords[coords.length - 1][0]}" cy="${coords[coords.length - 1][1]}" r="4" fill="#3FDA9A"/>`;
-  $(axisId).innerHTML = series.map((s) => `<span>${s.label || s.month?.slice(5) || ''}</span>`).join('');
+    <text class="bi-unit" x="8" y="16">${escHtml(chartUnit(mode))}</text>
+    ${grid}
+    <path d="${area}" fill="url(#g${svgId})"/>
+    <path d="${line}" fill="none" stroke="#3FDA9A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    ${dots}
+    ${xLabels}`;
+}
+
+function fmtDelta(n) {
+  if (n == null || Number.isNaN(Number(n))) return '<span class="sub">—</span>';
+  const v = Number(n);
+  const cls = v >= 0 ? 'up' : 'down';
+  const sign = v > 0 ? '+' : '';
+  return `<span class="mini-delta ${cls}">${sign}${v.toFixed(0)}%</span> vs anterior`;
+}
+
+function biBarHead(left, right) {
+  return `<div class="bi-bar bi-bar-head"><span class="bi-bar-label">${escHtml(left)}</span><span></span><span class="bi-bar-val">${escHtml(right)}</span></div>`;
+}
+
+function biBars(rows, valueKey, max, toneFn) {
+  const m = max || Math.max(...rows.map((r) => Number(r[valueKey]) || 0), 1);
+  return rows
+    .map((r) => {
+      const v = Number(r[valueKey]) || 0;
+      const pct = Math.max(v ? 4 : 0, (v / m) * 100);
+      const tone = toneFn ? toneFn(r) : '';
+      return `<div class="bi-bar">
+        <span class="bi-bar-label">${escHtml(r.label || r.name)}</span>
+        <div class="bi-bar-track"><span class="${tone}" style="width:${pct}%"></span></div>
+        <span class="bi-bar-val">${r.display || fmt(v)}</span>
+      </div>`;
+    })
+    .join('');
+}
+
+async function loadBi() {
+  const scope = state.user?.canSeeTeam ? state.biScope || 'workspace' : 'me';
+  const period = state.biPeriod || 'ytd';
+  const qs = new URLSearchParams({ scope, period });
+  if (scope === 'workspace' && state.biSellerId) qs.set('sellerId', state.biSellerId);
+  const data = await Api.get(`/bi?${qs}`);
+  const k = data.kpis || {};
+  const range = data.range || {};
+  $('biHello').textContent = `${fmtDay(range.from)} — ${fmtDay(range.to)} · ${k.count || 0} lançamento${k.count === 1 ? '' : 's'}`;
+
+  const tabs = $('biScopeTabs');
+  if (tabs) {
+    tabs.classList.toggle('hidden', !data.canSeeTeam);
+    tabs.querySelectorAll('[data-scope]').forEach((b) => {
+      b.classList.toggle('on', b.dataset.scope === scope);
+      b.classList.toggle('active', b.dataset.scope === scope);
+      b.onclick = () => {
+        state.biScope = b.dataset.scope;
+        loadBi();
+      };
+    });
+  }
+  document.querySelectorAll('#biPeriodTabs [data-period]').forEach((b) => {
+    b.classList.toggle('on', b.dataset.period === period);
+    b.classList.toggle('active', b.dataset.period === period);
+    b.onclick = () => {
+      state.biPeriod = b.dataset.period;
+      loadBi();
+    };
+  });
+
+  const sellerRow = $('biSellerRow');
+  if (sellerRow) {
+    const showSeller = !!data.canSeeTeam && scope === 'workspace';
+    sellerRow.classList.toggle('hidden', !showSeller);
+    if (showSeller && !$('biSeller').dataset.loaded) {
+      try {
+        const { members } = await Api.get('/team/members');
+        $('biSeller').innerHTML =
+          '<option value="">Todas</option><option value="' +
+          state.user.id +
+          '">Eu</option>' +
+          (members || [])
+            .filter((m) => m.memberUserId)
+            .map((m) => `<option value="${m.memberUserId}">${escHtml(m.name || m.email)}</option>`)
+            .join('');
+        $('biSeller').dataset.loaded = '1';
+      } catch (_) { /* ignore */ }
+      $('biSeller').onchange = () => {
+        state.biSellerId = $('biSeller').value;
+        loadBi();
+      };
+    }
+    if ($('biSeller') && state.biSellerId) $('biSeller').value = state.biSellerId;
+  }
+
+  const insight = $('biInsight');
+  if (insight) {
+    if (data.insight?.bestLabel) {
+      insight.classList.remove('hidden');
+      const w = data.insight.worstLabel
+        ? ` · mais fraco: ${data.insight.worstLabel}`
+        : '';
+      insight.innerHTML = `<div class="goal-meta"><span>Melhor mês no recorte</span><strong>${data.insight.bestLabel}</strong></div>
+        <div class="goal-sub">${fmt(data.insight.bestCommission)} de comissão${w}</div>`;
+    } else {
+      insight.classList.add('hidden');
+      insight.innerHTML = '';
+    }
+  }
+
+  $('biKpis').innerHTML = `
+    <div class="kpi-card"><div class="lbl">Comissão lançada</div><div class="val">${fmt(k.launched)}</div><div class="sub">${fmtDelta(k.deltas?.launched)}</div></div>
+    <div class="kpi-card"><div class="lbl">Já recebida</div><div class="val">${fmt(k.received)}</div><div class="sub">${fmtDelta(k.deltas?.received)}</div></div>
+    <div class="kpi-card"><div class="lbl">A receber</div><div class="val">${fmt(k.pipeline)}</div><div class="sub">carteira em aberto</div></div>
+    <div class="kpi-card"><div class="lbl">Vendas</div><div class="val">${fmt(k.revenue)}</div><div class="sub">${fmtDelta(k.deltas?.revenue)}</div></div>
+    <div class="kpi-card"><div class="lbl">Ticket médio</div><div class="val">${fmt(k.avgTicket)}</div><div class="sub">${k.count || 0} lanç.</div></div>
+    <div class="kpi-card"><div class="lbl">Comissão média</div><div class="val">${fmt(k.avgCommission)}</div><div class="sub">${k.cancelled ? k.cancelled + ' cancelada(s)' : 'por lançamento'}</div></div>`;
+
+  const mode = state.biChartMode || 'commission';
+  document.querySelectorAll('#biChartToggle [data-mode]').forEach((b) => {
+    b.classList.toggle('on', b.dataset.mode === mode);
+    b.onclick = () => {
+      state.biChartMode = b.dataset.mode;
+      const titles = { commission: 'Comissão no período', revenue: 'Vendas no período', count: 'Lançamentos no período' };
+      if ($('biChartTitle')) $('biChartTitle').textContent = titles[state.biChartMode] || titles.commission;
+      drawSeriesChart('biChart', 'biChartAxis', data.series || [], state.biChartMode);
+      document.querySelectorAll('#biChartToggle [data-mode]').forEach((x) =>
+        x.classList.toggle('on', x.dataset.mode === state.biChartMode)
+      );
+    };
+  });
+  const titles = { commission: 'Comissão no período', revenue: 'Vendas no período', count: 'Lançamentos no período' };
+  if ($('biChartTitle')) $('biChartTitle').textContent = titles[mode] || titles.commission;
+  drawSeriesChart('biChart', 'biChartAxis', data.series || [], mode);
+
+  const mixRows = (data.mix || []).map((m) => ({
+    name: m.name,
+    commission: m.commission,
+    display: `${fmt(m.commission)} · ${Math.round((m.share || 0) * 100)}%`,
+  }));
+  $('biMix').innerHTML = mixRows.length
+    ? biBarHead('Tipo', 'Comissão') + biBars(mixRows, 'commission')
+    : '<p class="empty">Sem mix no período.</p>';
+
+  const agingTone = (r) => (r.key === 'd90' ? 'red' : r.key === 'd30' || r.key === 'd7' ? 'amber' : '');
+  const agingRows = (data.aging || []).map((a) => ({
+    ...a,
+    display: `${fmt(a.amount)} · ${a.count}`,
+  }));
+  $('biAging').innerHTML = agingRows.some((a) => a.amount)
+    ? biBarHead('Faixa', 'A receber') + biBars(agingRows, 'amount', null, agingTone)
+    : '<p class="empty">Nada em aberto.</p>';
+
+  const funnelWrap = $('biFunnelWrap');
+  if (funnelWrap) {
+    const funnel = data.funnel || [];
+    funnelWrap.classList.toggle('hidden', !funnel.length);
+    if (funnel.length) {
+      $('biFunnel').innerHTML =
+        biBarHead('Estágio', 'Leads · valor') +
+        biBars(
+          funnel.map((f) => ({
+            name: f.label,
+            count: f.count,
+            display: `${f.count} · ${fmt(f.value)}`,
+          })),
+          'count',
+          null,
+          (r) => (r.name === 'Perdido' ? 'red' : r.name === 'Fechado' ? '' : 'blue')
+        );
+    }
+  }
+
+  const goalsBox = $('biGoals');
+  const gWrap = $('biGoalsWrap');
+  if (goalsBox) {
+    const goals = (data.goals || []).slice(0, 6);
+    if (gWrap) gWrap.classList.toggle('hidden', !goals.length);
+    goalsBox.innerHTML = goals
+      .map((g) => {
+        const pct = Math.min(100, g.percent || 0);
+        const unit =
+          g.metric === 'quantity'
+            ? `${Math.round(g.current)} / ${Math.round(g.target)}`
+            : `${fmt(g.current)} / ${fmt(g.target)}`;
+        return `<div class="goal-bar">
+          <div class="goal-meta"><span>${escHtml(g.name || 'Meta')} · ${fmtDay(g.periodStart)}</span><strong>${Math.round(g.percent)}%</strong></div>
+          <div class="goal-track"><span style="width:${pct}%"></span></div>
+          <div class="goal-sub">${unit}</div>
+        </div>`;
+      })
+      .join('');
+  }
+
+  const rankWrap = $('biRankingWrap');
+  if (rankWrap) {
+    const ranking = data.ranking || [];
+    rankWrap.classList.toggle('hidden', ranking.length < 2);
+    if (ranking.length) {
+      $('biRanking').innerHTML = ranking
+        .map(
+          (r, i) => `<button class="sale-row" type="button" data-seller="${r.sellerId || r.sellerid || ''}">
+            <span class="sale-dot pendente"></span>
+            <div class="sale-main"><div class="title">${i + 1}. ${escHtml(r.name)}</div>
+            <div class="sub">${r.launches} lançamento${r.launches === 1 ? '' : 's'}</div></div>
+            <div class="sale-amt"><div class="v mono">${fmt(r.commission)}</div></div>
+          </button>`
+        )
+        .join('');
+      $('biRanking').querySelectorAll('[data-seller]').forEach((btn) => {
+        btn.onclick = () => {
+          state.biSellerId = btn.dataset.seller;
+          if ($('biSeller')) $('biSeller').value = state.biSellerId;
+          loadBi();
+        };
+      });
+    }
+  }
+
+  const weekMax = Math.max(...(data.weekday || []).map((w) => w.count), 1);
+  $('biWeekday').innerHTML = data.weekday?.length
+    ? `<div class="bi-week-caption">Lançamentos por dia</div>
+      <div class="bi-week">${data.weekday
+        .map((w) => {
+          const h = Math.max(6, (w.count / weekMax) * 72);
+          return `<div class="bi-week-col"><b>${w.count}</b><i style="height:${h}px"></i><span>${w.label}</span></div>`;
+        })
+        .join('')}</div>`
+    : '<p class="empty">—</p>';
+
+  $('biTop').innerHTML = (data.topItems || []).length
+    ? biBarHead('Item', 'Qtd · comissão') +
+      biBars(
+        data.topItems.map((t) => ({
+          name: t.name,
+          launches: t.launches,
+          display: `${t.launches} · ${fmt(t.commission)}`,
+        })),
+        'launches'
+      )
+    : '<p class="empty">Sem itens no período.</p>';
 }
 
 function renderLadder(stepsId, labelsId, bands, units) {

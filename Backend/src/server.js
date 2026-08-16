@@ -96,6 +96,7 @@ app.use('/api/stores', storeRoutes);
 app.use('/api/sales', salesRoutes);
 app.use('/api/leads', leadsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/bi', require('./routes/bi'));
 app.use('/api/tools', toolsRoutes);
 app.use('/api/team', teamRoutes);
 app.use('/api/billing', billingRoutes);

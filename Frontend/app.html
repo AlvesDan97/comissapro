@@ -207,6 +207,7 @@
       <div class="nav-group-label">Visão geral</div>
       <button class="nav-item" data-screen="comissoes"><span class="ico">%</span>Comissões</button>
       <button class="nav-item" data-screen="dashboard"><span class="ico">▣</span>Painel</button>
+      <button class="nav-item" data-screen="bi"><span class="ico">▦</span>Relatórios</button>
       <button class="nav-item" data-screen="vendas"><span class="ico">☰</span>Vendas</button>
       <button class="nav-item" data-screen="pipeline" data-nav="pipeline"><span class="ico">◎</span>Pipeline</button>
       <div class="nav-group-label">Recursos</div>
@@ -315,8 +316,88 @@
         <div class="section-title">Carteira</div>
         <p class="screen-lead" style="margin-top:-4px">Toque na comissão para ver os lançamentos. Use Lançar para registrar uma nova.</p>
         <div id="dashCommissionList"></div>
+        <div class="analytics-card" id="dashChartCard" style="margin-top:18px">
+          <div class="an-head">
+            <div>
+              <div class="hero-label" style="margin:0">Últimos 6 meses</div>
+            </div>
+            <div class="an-toggle" id="dashChartToggle">
+              <button type="button" class="on" data-mode="commission">Comissão</button>
+              <button type="button" data-mode="revenue">Vendas</button>
+            </div>
+          </div>
+          <svg id="dashChart" viewBox="0 0 640 228" preserveAspectRatio="xMidYMid meet" class="bi-chart" role="img" aria-label="Comissão e vendas nos últimos 6 meses"></svg>
+          <div class="chart-axis hidden" id="dashChartAxis"></div>
+          <button class="link-btn" type="button" id="dashGoBi">Abrir relatórios →</button>
+        </div>
         <div class="section-title">Últimos lançamentos</div>
         <div class="op-card" id="recentSales" style="padding:8px 16px"></div>
+      </section>
+
+      <!-- RELATÓRIOS / BI -->
+      <section class="screen" id="screen-bi">
+        <p class="screen-lead" id="biHello">Tendência, mix, recebimento e meta da operação.</p>
+        <div class="filter-row hidden" id="biScopeTabs">
+          <button class="chip on" type="button" data-scope="workspace">Espaço</button>
+          <button class="chip" type="button" data-scope="me">Pessoal</button>
+        </div>
+        <div class="filter-row" id="biPeriodTabs">
+          <button class="chip on" type="button" data-period="ytd">Ano até hoje</button>
+          <button class="chip" type="button" data-period="month">Este mês</button>
+          <button class="chip" type="button" data-period="6m">6 meses</button>
+          <button class="chip" type="button" data-period="year">Ano</button>
+        </div>
+        <div class="form-grid hidden" id="biSellerRow" style="margin-bottom:14px">
+          <div class="form-field"><label>Pessoa</label>
+            <select id="biSeller"><option value="">Todas</option></select>
+          </div>
+        </div>
+        <div id="biInsight" class="goal-bar hidden"></div>
+        <div class="kpi-grid bi-kpis" id="biKpis"></div>
+        <div class="analytics-card" style="margin-top:16px">
+          <div class="an-head">
+            <div class="hero-label" style="margin:0" id="biChartTitle">Comissão no período</div>
+            <div class="an-toggle" id="biChartToggle">
+              <button type="button" class="on" data-mode="commission">Comissão</button>
+              <button type="button" data-mode="revenue">Vendas</button>
+              <button type="button" data-mode="count">Qtd</button>
+            </div>
+          </div>
+          <svg id="biChart" viewBox="0 0 640 228" preserveAspectRatio="xMidYMid meet" class="bi-chart" role="img" aria-label="Série mensal de comissão, vendas ou quantidade"></svg>
+          <div class="chart-axis hidden" id="biChartAxis"></div>
+        </div>
+        <div class="two-col" style="margin-top:8px">
+          <div>
+            <div class="section-title">Mix da carteira</div>
+            <div class="op-card" id="biMix"></div>
+          </div>
+          <div>
+            <div class="section-title">Aging a receber</div>
+            <div class="op-card" id="biAging"></div>
+          </div>
+        </div>
+        <div id="biFunnelWrap" class="hidden">
+          <div class="section-title">Funil do pipeline</div>
+          <div class="op-card" id="biFunnel"></div>
+        </div>
+        <div id="biGoalsWrap">
+          <div class="section-title">Metas no recorte</div>
+          <div id="biGoals"></div>
+        </div>
+        <div id="biRankingWrap" class="hidden">
+          <div class="section-title">Ranking do período</div>
+          <div id="biRanking"></div>
+        </div>
+        <div class="two-col">
+          <div>
+            <div class="section-title">Por dia da semana</div>
+            <div class="op-card" id="biWeekday"></div>
+          </div>
+          <div>
+            <div class="section-title">Itens mais lançados</div>
+            <div class="op-card" id="biTop"></div>
+          </div>
+        </div>
       </section>
 
       <!-- VENDAS -->
