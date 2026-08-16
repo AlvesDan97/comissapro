@@ -92,6 +92,24 @@ button{cursor:pointer}
 .social-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
 .login-alt{text-align:center;margin-top:15px;font-size:12.5px;color:var(--text-dim)}
 .login-alt a{color:var(--mint);font-weight:600;text-decoration:none;cursor:pointer}
+.pw-wrap{position:relative}
+.pw-wrap input{width:100%;padding-right:46px}
+.pw-eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:38px;height:38px;border:none;background:transparent;color:var(--text-dim);padding:0;display:flex;align-items:center;justify-content:center}
+.pw-eye svg{width:20px;height:20px;display:block}
+.pw-eye.on{color:var(--mint)}
+.pw-rules{margin:8px 0 4px}
+.pw-meter{height:4px;background:var(--border);border-radius:99px;overflow:hidden}
+.pw-meter span{display:block;height:100%;width:0;background:var(--red);transition:width .2s,background .2s}
+.pw-meter.s1 span{width:25%;background:var(--red)}
+.pw-meter.s2 span{width:50%;background:var(--amber)}
+.pw-meter.s3 span{width:75%;background:#c9c05a}
+.pw-meter.s4 span{width:100%;background:var(--mint)}
+.pw-meter-label{margin:6px 0 0;font-size:11.5px;color:var(--text-dim);font-weight:600}
+.pw-rules ul{list-style:none;padding:0;margin:8px 0 0;display:grid;gap:3px}
+.pw-rules li{font-size:12px;color:var(--text-faint)}
+.pw-rules li::before{content:'○ ';font-size:10px}
+.pw-rules li.ok{color:var(--mint)}
+.pw-rules li.ok::before{content:'● '}
 .error-box{background:var(--red-dim);color:var(--red);border:1px solid rgba(240,96,92,.3);padding:10px 12px;border-radius:8px;font-size:12.5px;margin-bottom:12px}
 .ok-box{background:var(--mint-dim);color:var(--mint);border:1px solid rgba(63,218,154,.3);padding:10px 12px;border-radius:8px;font-size:12.5px;margin-bottom:12px}
 
@@ -392,6 +410,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:17px;heigh
   .field input,.field select,.field textarea,.form-field input,.form-field select,.form-field textarea{
     font-size:16px;padding:12px 13px;
   }
+  .pw-wrap input{padding-right:46px}
   .plan-pick button{padding:11px 12px;font-size:14px}
   .plan-pick button small{font-size:12px;white-space:normal}
   .biometry-row,.toggle-field{font-size:12px;gap:10px}

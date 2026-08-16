@@ -96,7 +96,7 @@ const TEMPLATES = {
     html: wrap({
       title: 'Mês grátis acabando',
       preheader: `${v.days} dia(s) restantes`,
-      body: `<p style="margin:0">Faltam <strong>${esc(v.days)} dia${v.days === 1 ? '' : 's'}</strong> do período grátis. Em seguida o Asaas cobra o plano <strong>${esc(v.planName)}</strong>. Sem reembolso depois do trial.</p>`,
+      body: `<p style="margin:0">Faltam <strong>${esc(v.days)} dia${v.days === 1 ? '' : 's'}</strong> do período grátis. Em seguida o Asaas cobra o plano <strong>${esc(v.planName)}</strong>.</p>`,
       ctaLabel: 'Ver planos',
       ctaUrl: v.link,
     }),

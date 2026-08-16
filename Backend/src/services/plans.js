@@ -22,7 +22,7 @@ const DEFAULT_PLANS = {
       'Painel pessoal, metas e comparativo no tempo',
       'Simulador rápido',
       'Exportação CSV',
-      '1 mês grátis · sem reembolso depois',
+      '1 mês grátis',
     ],
     highlighted: false,
     sortOrder: 1,
@@ -43,7 +43,7 @@ const DEFAULT_PLANS = {
       '1 parceiro no espaço',
       'Painel do espaço (2 pessoas)',
       'Catálogo de métricas',
-      '1 mês grátis · sem reembolso depois',
+      '1 mês grátis',
     ],
     highlighted: true,
     sortOrder: 2,
@@ -64,7 +64,7 @@ const DEFAULT_PLANS = {
       'Usuário extra R$ 59/mês',
       'Papéis: ver / lançar / admin',
       'Painel do time, ranking e comparar por vendedor',
-      '1 mês grátis · sem reembolso depois',
+      '1 mês grátis',
     ],
     highlighted: false,
     sortOrder: 3,
@@ -181,6 +181,9 @@ async function loadFromDb() {
       ]
     );
   }
+  await db.exec(
+    `UPDATE plan_catalog SET features_json = REPLACE(features_json, '1 mês grátis · sem reembolso depois', '1 mês grátis')`
+  );
   await refreshCache();
 }
 

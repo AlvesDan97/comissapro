@@ -10,6 +10,7 @@ const { NICHE_FIELDS } = require('../services/commissionEngine');
 const { getPlan } = require('../services/plans');
 const { sendTemplate, appBaseUrl } = require('../services/mail');
 const { notify } = require('../services/notify');
+const { passwordError } = require('../services/password');
 
 const router = express.Router();
 
@@ -27,9 +28,8 @@ router.post(
     if (!req.body?.acceptedTerms || !req.body?.acceptedPrivacy) {
       return res.status(400).json({ error: 'É necessário aceitar os Termos de Uso e a Política de Privacidade.' });
     }
-    if (String(password).length < 8) {
-      return res.status(400).json({ error: 'Senha deve ter pelo menos 8 caracteres' });
-    }
+    const weak = passwordError(password);
+    if (weak) return res.status(400).json({ error: weak });
     const plan = getPlan(planId) || getPlan('pro');
     const cycle = billingCycle === 'yearly' ? 'yearly' : 'monthly';
     const exists = await db.get('SELECT id FROM users WHERE email = ?', [email.toLowerCase()]);
@@ -244,7 +244,8 @@ router.post(
   asyncHandler(async (req, res) => {
     const { token: resetToken, password } = req.body || {};
     if (!resetToken || !password) return res.status(400).json({ error: 'Token e senha são obrigatórios' });
-    if (String(password).length < 8) return res.status(400).json({ error: 'Senha deve ter pelo menos 8 caracteres' });
+    const weakReset = passwordError(password);
+    if (weakReset) return res.status(400).json({ error: weakReset });
     const user = await db.get(
       'SELECT * FROM users WHERE reset_token=? AND reset_token_expires >= ?',
       [resetToken, new Date().toISOString()]
@@ -291,7 +292,8 @@ router.post(
   asyncHandler(async (req, res) => {
     const { token: inviteToken, password, name, acceptedTerms, acceptedPrivacy } = req.body || {};
     if (!inviteToken || !password) return res.status(400).json({ error: 'Token e senha são obrigatórios' });
-    if (String(password).length < 8) return res.status(400).json({ error: 'Senha deve ter pelo menos 8 caracteres' });
+    const weakInvite = passwordError(password);
+    if (weakInvite) return res.status(400).json({ error: weakInvite });
     if (!acceptedTerms || !acceptedPrivacy) {
       return res.status(400).json({ error: 'Aceite os Termos e a Privacidade.' });
     }

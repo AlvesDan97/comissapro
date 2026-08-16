@@ -15,7 +15,7 @@ router.get('/plans', (_req, res) => {
     trialDays: 30,
     currency: 'BRL',
     asaasEnabled: asaas.enabled(),
-    note: '1 mês grátis para testar. Sem reembolso após o período gratuito. Pagamento via Asaas (Pix/cartão) na produção.',
+    note: '1 mês grátis para testar. Pagamento via Asaas (Pix/cartão) na produção.',
   });
 });
 

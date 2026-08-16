@@ -46,10 +46,25 @@
         <button type="button" class="on" data-cycle="monthly">Mensal</button>
         <button type="button" data-cycle="yearly">Anual</button>
       </div>
-      <p class="login-alt" style="margin:0 0 12px;font-size:11px">1 mês grátis em qualquer plano. Sem reembolso depois. Você pode trocar depois em Planos.</p>
+      <p class="login-alt" style="margin:0 0 12px;font-size:11px">1 mês grátis em qualquer plano. Você pode trocar depois em Planos.</p>
     </div>
     <div class="field"><label>E-mail</label><input id="authEmail" type="email" autocomplete="username" placeholder="seu@email.com"></div>
-    <div class="field"><label>Senha</label><input id="authPassword" type="password" autocomplete="current-password" placeholder="Sua senha"></div>
+    <div class="field"><label>Senha</label>
+      <div class="pw-wrap">
+        <input id="authPassword" type="password" autocomplete="current-password" placeholder="Sua senha">
+        <button type="button" class="pw-eye" data-eye="authPassword" aria-label="Mostrar senha"></button>
+      </div>
+      <div id="pwRules" class="pw-rules hidden">
+        <div class="pw-meter" id="pwMeter"><span></span></div>
+        <p class="pw-meter-label" id="pwMeterLabel">Crie uma senha forte</p>
+        <ul>
+          <li data-rule="len">Pelo menos 8 caracteres</li>
+          <li data-rule="upper">Uma letra maiúscula</li>
+          <li data-rule="lower">Uma letra minúscula</li>
+          <li data-rule="num">Um número</li>
+        </ul>
+      </div>
+    </div>
     <div class="field hidden" id="otpField"><label>Código 2FA (OTP)</label><input id="authOtp" type="text" placeholder="123456"></div>
     <div class="biometry-row"><span>Entrar com biometria</span><button class="switch on" id="bioSwitch" type="button" aria-label="Biometria"></button></div>
     <label id="termsAcceptRow" class="biometry-row" style="margin:0 0 14px;align-items:flex-start;gap:10px;display:none">
@@ -64,7 +79,22 @@
       <button class="btn-secondary" type="button" id="btnForgot">Enviar link</button>
     </div>
     <div id="resetBox" class="hidden" style="margin-top:10px">
-      <div class="field"><label>Nova senha</label><input id="resetPassword" type="password"></div>
+      <div class="field"><label>Nova senha</label>
+        <div class="pw-wrap">
+          <input id="resetPassword" type="password" autocomplete="new-password" placeholder="Nova senha">
+          <button type="button" class="pw-eye" data-eye="resetPassword" aria-label="Mostrar senha"></button>
+        </div>
+        <div class="pw-rules" data-pw="resetPassword">
+          <div class="pw-meter"><span></span></div>
+          <p class="pw-meter-label">Crie uma senha forte</p>
+          <ul>
+            <li data-rule="len">Pelo menos 8 caracteres</li>
+            <li data-rule="upper">Uma letra maiúscula</li>
+            <li data-rule="lower">Uma letra minúscula</li>
+            <li data-rule="num">Um número</li>
+          </ul>
+        </div>
+      </div>
       <button class="btn-primary" type="button" id="btnReset">Salvar nova senha</button>
     </div>
     <div id="confirmBox" class="hidden" style="margin-top:10px">
@@ -74,7 +104,22 @@
     <div id="inviteBox" class="hidden" style="margin-top:10px">
       <p class="login-sub" id="inviteHint">Você foi convidado para um espaço.</p>
       <div class="field"><label>Seu nome</label><input id="inviteJoinName" type="text"></div>
-      <div class="field"><label>Crie uma senha</label><input id="inviteJoinPassword" type="password"></div>
+      <div class="field"><label>Crie uma senha</label>
+        <div class="pw-wrap">
+          <input id="inviteJoinPassword" type="password" autocomplete="new-password" placeholder="Crie uma senha">
+          <button type="button" class="pw-eye" data-eye="inviteJoinPassword" aria-label="Mostrar senha"></button>
+        </div>
+        <div class="pw-rules" data-pw="inviteJoinPassword">
+          <div class="pw-meter"><span></span></div>
+          <p class="pw-meter-label">Crie uma senha forte</p>
+          <ul>
+            <li data-rule="len">Pelo menos 8 caracteres</li>
+            <li data-rule="upper">Uma letra maiúscula</li>
+            <li data-rule="lower">Uma letra minúscula</li>
+            <li data-rule="num">Um número</li>
+          </ul>
+        </div>
+      </div>
       <button class="btn-primary" type="button" id="btnAcceptInvite">Entrar no espaço</button>
     </div>
     <p class="login-alt" style="margin-top:10px;font-size:11px">

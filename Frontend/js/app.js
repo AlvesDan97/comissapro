@@ -95,6 +95,62 @@ function toast(msg, isError) {
   }
 }
 
+function passwordChecks(pw) {
+  const p = String(pw || '');
+  return {
+    len: p.length >= 8,
+    upper: /[A-Z]/.test(p),
+    lower: /[a-z]/.test(p),
+    num: /\d/.test(p),
+  };
+}
+function passwordStrong(pw) {
+  const c = passwordChecks(pw);
+  return c.len && c.upper && c.lower && c.num;
+}
+function updatePwHints(input, box) {
+  if (!input || !box) return;
+  const c = passwordChecks(input.value);
+  const score = ['len', 'upper', 'lower', 'num'].filter((k) => c[k]).length;
+  const meter = box.querySelector('.pw-meter');
+  const label = box.querySelector('.pw-meter-label');
+  if (meter) meter.className = `pw-meter s${score}`;
+  if (label) {
+    label.textContent = ['Crie uma senha forte', 'Fraca', 'Razoável', 'Boa', 'Forte'][score];
+  }
+  box.querySelectorAll('[data-rule]').forEach((li) => li.classList.toggle('ok', !!c[li.dataset.rule]));
+}
+function wirePasswordEyes() {
+  const eyeOpen =
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+  const eyeOff =
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19M1 1l22 22"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/></svg>';
+  document.querySelectorAll('.pw-eye').forEach((btn) => {
+    if (!btn.innerHTML.trim()) btn.innerHTML = eyeOpen;
+    btn.onclick = () => {
+      const input = $(btn.dataset.eye);
+      if (!input) return;
+      const show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      btn.classList.toggle('on', show);
+      btn.innerHTML = show ? eyeOff : eyeOpen;
+      btn.setAttribute('aria-label', show ? 'Ocultar senha' : 'Mostrar senha');
+    };
+  });
+  document.querySelectorAll('.pw-rules[data-pw]').forEach((box) => {
+    const input = $(box.dataset.pw);
+    if (!input) return;
+    const run = () => updatePwHints(input, box);
+    input.addEventListener('input', run);
+    run();
+  });
+  if ($('authPassword') && $('pwRules')) {
+    $('authPassword').addEventListener('input', () => {
+      if (!$('pwRules').classList.contains('hidden')) updatePwHints($('authPassword'), $('pwRules'));
+    });
+  }
+}
+
 /* ---------- Auth / Onboarding ---------- */
 function renderNiches() {
   $('nicheGrid').innerHTML = NICHES.map(
@@ -122,6 +178,14 @@ function setAuthMode(mode) {
   if (reg) syncPlanPickUi();
   const termsRow = $('termsAcceptRow');
   if (termsRow) termsRow.style.display = reg ? 'flex' : 'none';
+  const pwRules = $('pwRules');
+  if (pwRules) pwRules.classList.toggle('hidden', !reg);
+  const pwInput = $('authPassword');
+  if (pwInput) {
+    pwInput.autocomplete = reg ? 'new-password' : 'current-password';
+    pwInput.placeholder = reg ? 'Crie uma senha' : 'Sua senha';
+    if (reg) updatePwHints(pwInput, pwRules);
+  }
   $('authToggleWrap').innerHTML = reg
     ? 'Já tem conta? <a id="authToggle">Entrar</a>'
     : 'Novo por aqui? <a id="authToggle">Criar conta</a>';
@@ -158,6 +222,10 @@ async function doAuth() {
       const name = $('authName').value.trim();
       if (!state.selectedPlanId) {
         toast('Escolha um plano para criar a conta.', true);
+        return;
+      }
+      if (!passwordStrong(password)) {
+        toast('Senha fraca. Use 8+ caracteres, com maiúscula, minúscula e número.', true);
         return;
       }
       data = await Api.post('/auth/register', {
@@ -1482,7 +1550,7 @@ async function loadPlansScreen() {
     <div class="kv"><span>Ciclo</span><span>${s.billingCycle === 'yearly' ? 'Anual · recorrente' : 'Mensal · recorrente'}</span></div>
     <div class="kv"><span>Valor</span><span>${priceLabel}</span></div>
     <div class="kv"><span>Próxima cobrança</span><span>${next}</span></div>
-    <div class="kv" style="border:none"><span>1 mês grátis</span><span>Sem reembolso depois${s.trialEndsAt ? ' · até ' + new Date(s.trialEndsAt).toLocaleDateString('pt-BR') : ''}</span></div>
+    <div class="kv" style="border:none"><span>1 mês grátis</span><span>${s.trialEndsAt ? 'até ' + new Date(s.trialEndsAt).toLocaleDateString('pt-BR') : 'incluso'}</span></div>
     <div class="row-actions" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px">
       ${s.payUrl ? `<a class="btn-primary" href="${s.payUrl}" target="_blank" rel="noopener" style="text-align:center;text-decoration:none">Pagar / cadastrar Pix ou cartão</a>` : ''}
       ${sub.isOwner ? '<button class="btn-secondary" type="button" id="btnCancelPlan">Cancelar assinatura</button>' : ''}
@@ -1762,6 +1830,7 @@ async function fillPlanPick() {
 
 /* ---------- Boot / Events ---------- */
 function wireEvents() {
+  wirePasswordEyes();
   $('btnStart').onclick = () => {
     $('splash').classList.add('hide');
     show($('login'));
@@ -1973,7 +2042,12 @@ function wireEvents() {
   }
   if ($('btnReset')) {
     $('btnReset').onclick = async () => {
-      const data = await Api.post('/auth/reset', { token: urlParams.get('reset'), password: $('resetPassword').value });
+      const password = $('resetPassword').value;
+      if (!passwordStrong(password)) {
+        toast('Senha fraca. Use 8+ caracteres, com maiúscula, minúscula e número.', true);
+        return;
+      }
+      const data = await Api.post('/auth/reset', { token: urlParams.get('reset'), password });
       Api.setToken(data.token);
       state.user = data.user;
       await enterApp();
@@ -1989,6 +2063,10 @@ function wireEvents() {
     $('btnAcceptInvite').onclick = async () => {
       if (!$('termsAccept')?.checked) {
         toast('Aceite os Termos para entrar.', true);
+        return;
+      }
+      if (!passwordStrong($('inviteJoinPassword').value)) {
+        toast('Senha fraca. Use 8+ caracteres, com maiúscula, minúscula e número.', true);
         return;
       }
       const data = await Api.post('/auth/accept-invite', {
