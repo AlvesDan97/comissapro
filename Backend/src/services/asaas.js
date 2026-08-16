@@ -51,22 +51,82 @@ function cycleMap(billingCycle) {
   return billingCycle === 'yearly' ? 'YEARLY' : 'MONTHLY';
 }
 
-async function createSubscription({ customerId, plan, billingCycle, extraSeats = 0 }) {
+async function createSubscription({ customerId, plan, billingCycle, extraSeats = 0, nextDueDate }) {
   if (!enabled()) return null;
   const value =
     (billingCycle === 'yearly' ? plan.priceYearly : plan.priceMonthly) +
     extraSeats * (plan.extraSeatPrice || 0) * (billingCycle === 'yearly' ? 12 : 1);
-  return asaasFetch('/v3/subscriptions', {
-    method: 'POST',
-    body: {
-      customer: customerId,
-      billingType: 'UNDEFINED',
-      value,
-      cycle: cycleMap(billingCycle),
-      description: `Comiss ${plan.name}${extraSeats ? ` + ${extraSeats} extra` : ''}`,
-      externalReference: `${plan.id}:${billingCycle}`,
-    },
-  });
+  const body = {
+    customer: customerId,
+    billingType: 'UNDEFINED',
+    value,
+    cycle: cycleMap(billingCycle),
+    description: `Comiss ${plan.name}${extraSeats ? ` + ${extraSeats} extra` : ''}`,
+    externalReference: `${plan.id}:${billingCycle}`,
+  };
+  if (nextDueDate) body.nextDueDate = String(nextDueDate).slice(0, 10);
+  return asaasFetch('/v3/subscriptions', { method: 'POST', body });
+}
+
+async function getSubscription(subscriptionId) {
+  if (!enabled() || !subscriptionId) return null;
+  try {
+    return await asaasFetch(`/v3/subscriptions/${subscriptionId}`);
+  } catch {
+    return null;
+  }
+}
+
+async function listSubscriptionPayments(subscriptionId, limit = 24) {
+  if (!enabled() || !subscriptionId) return [];
+  try {
+    const data = await asaasFetch(`/v3/subscriptions/${subscriptionId}/payments?limit=${limit}`);
+    const rows = Array.isArray(data) ? data : data.data;
+    if (rows?.length || data?.object === 'list') return rows || [];
+  } catch {
+    /* fallback abaixo */
+  }
+  try {
+    const data = await asaasFetch(`/v3/payments?subscription=${encodeURIComponent(subscriptionId)}&limit=${limit}`);
+    return data.data || [];
+  } catch {
+    return [];
+  }
+}
+
+function mapPayment(p) {
+  if (!p) return null;
+  const status = String(p.status || '').toUpperCase();
+  const failed = ['OVERDUE', 'REFUND_REQUESTED', 'CHARGEBACK_REQUESTED', 'DUNNING_REQUESTED'].includes(status);
+  const open = ['PENDING', 'OVERDUE', 'AWAITING_RISK_ANALYSIS'].includes(status);
+  return {
+    id: p.id,
+    value: p.value,
+    dueDate: p.dueDate,
+    paymentDate: p.clientPaymentDate || p.paymentDate || null,
+    status,
+    statusLabel: paymentLabel(status),
+    billingType: p.billingType,
+    invoiceUrl: p.invoiceUrl || p.bankSlipUrl || null,
+    invoiceNumber: p.invoiceNumber || null,
+    open,
+    failed,
+  };
+}
+
+function paymentLabel(status) {
+  const map = {
+    PENDING: 'Aguardando pagamento',
+    RECEIVED: 'Pago',
+    CONFIRMED: 'Confirmado',
+    OVERDUE: 'Em atraso',
+    REFUNDED: 'Estornado',
+    RECEIVED_IN_CASH: 'Pago',
+    REFUND_REQUESTED: 'Estorno pedido',
+    CHARGEBACK_REQUESTED: 'Chargeback',
+    AWAITING_RISK_ANALYSIS: 'Em análise',
+  };
+  return map[status] || status;
 }
 
 async function updateSubscription(subscriptionId, { value, nextDueDate }) {
@@ -99,6 +159,9 @@ module.exports = {
   asaasFetch,
   ensureCustomer,
   createSubscription,
+  getSubscription,
+  listSubscriptionPayments,
+  mapPayment,
   updateSubscription,
   cancelSubscription,
   mapWebhookEvent,

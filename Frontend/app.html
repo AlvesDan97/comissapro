@@ -35,6 +35,19 @@
     <p class="login-sub" id="authSub">Acesse sua central de comissões.</p>
     <div id="authError" class="error-box hidden"></div>
     <div class="field" id="nameField" style="display:none"><label>Nome</label><input id="authName" type="text" placeholder="Seu nome"></div>
+    <div id="planPickWrap" class="hidden">
+      <label class="plan-pick-label">Qual plano?</label>
+      <div class="plan-pick" id="planPick">
+        <button type="button" data-plan="solo"><strong>Solo</strong><small>R$ 49/mês · só você</small></button>
+        <button type="button" data-plan="pro"><strong>Pro</strong><small>R$ 89/mês · 1 parceiro e pipeline</small></button>
+        <button type="button" data-plan="time"><strong>Time</strong><small>R$ 149/mês · equipe e ranking</small></button>
+      </div>
+      <div class="an-toggle" id="regCycle" style="margin:0 0 8px">
+        <button type="button" class="on" data-cycle="monthly">Mensal</button>
+        <button type="button" data-cycle="yearly">Anual</button>
+      </div>
+      <p class="login-alt" style="margin:0 0 12px;font-size:11px">1 mês grátis em qualquer plano. Sem reembolso depois. Você pode trocar depois em Planos.</p>
+    </div>
     <div class="field"><label>E-mail</label><input id="authEmail" type="email" value="marina.souza@exemplo.com"></div>
     <div class="field"><label>Senha</label><input id="authPassword" type="password" value="demo1234"></div>
     <div class="field hidden" id="otpField"><label>Código 2FA (OTP)</label><input id="authOtp" type="text" placeholder="123456"></div>
@@ -150,7 +163,7 @@
       <div class="nav-group-label">Conta</div>
       <button class="nav-item" data-screen="perfil"><span class="ico">👤</span>Perfil</button>
       <button class="nav-item" data-screen="equipe" data-nav="equipe"><span class="ico">☺</span>Equipe</button>
-      <button class="nav-item" data-screen="planos" data-nav="planos"><span class="ico">◆</span>Planos</button>
+      <button class="nav-item" data-screen="planos" data-nav="planos"><span class="ico">◆</span>Planos e cobrança</button>
       <button class="nav-item" data-screen="config"><span class="ico">⚙</span>Configurações</button>
       <a href="/" style="display:block;margin:12px 10px 0;font-size:12px;color:var(--text-faint);text-decoration:none">← Site Comiss</a>
       <div class="sidebar-foot">
@@ -378,8 +391,12 @@
 
       <!-- PLANOS -->
       <section class="screen" id="screen-planos">
-        <div class="section-title" style="margin-top:0">Seu plano</div>
+        <div class="section-title" style="margin-top:0">Sua cobrança</div>
         <div class="settings-card" id="currentPlanCard" style="margin-bottom:16px"></div>
+        <div id="billingAlert" class="receive-banner hidden"></div>
+        <div class="section-title">Faturas</div>
+        <p class="screen-lead">Pix ou cartão na página segura do Asaas. Recorrência mensal/anual. Trocar cartão = pagar de novo na fatura aberta.</p>
+        <div id="invoiceList"></div>
         <div class="section-title">Trocar plano
           <div class="an-toggle" id="planCycleToggle" style="margin:0">
             <button type="button" class="on" data-cycle="monthly">Mensal</button>

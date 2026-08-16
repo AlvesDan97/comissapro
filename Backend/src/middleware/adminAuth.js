@@ -19,11 +19,18 @@ function ipAllowed(req) {
   return allow.some((a) => ip === a || ip.endsWith(a) || ip.includes(a));
 }
 
-function emailAllowed(email) {
-  const list = (process.env.ADMIN_EMAILS || '')
+function adminEmails() {
+  const raw = [process.env.ADMIN_EMAIL, process.env.ADMIN_EMAILS]
+    .filter(Boolean)
+    .join(',');
+  return raw
     .split(',')
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
+}
+
+function emailAllowed(email) {
+  const list = adminEmails();
   if (!list.length) return true;
   return list.includes(String(email || '').toLowerCase());
 }

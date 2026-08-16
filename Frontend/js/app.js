@@ -3,7 +3,7 @@ const urlParams = new URLSearchParams(location.search);
 
 const state = {
   mode: urlParams.get('mode') === 'register' ? 'register' : 'login',
-  selectedPlanId: urlParams.get('plan') || 'pro',
+  selectedPlanId: urlParams.get('plan') || null,
   billingCycle: urlParams.get('cycle') === 'yearly' ? 'yearly' : 'monthly',
   catalogPlans: [],
   user: null,
@@ -55,7 +55,7 @@ const TITLES = {
   comparar: 'Comparar',
   equipe: 'Equipe',
   pendencias: 'Pendências',
-  planos: 'Planos',
+      planos: 'Planos e cobrança',
   config: 'Configurações',
 };
 
@@ -116,6 +116,9 @@ function setAuthMode(mode) {
   $('authSub').textContent = reg ? 'Comece sua central de comissões.' : 'Acesse sua central de comissões.';
   $('btnAuth').textContent = reg ? 'Criar conta' : 'Entrar';
   $('nameField').style.display = reg ? 'block' : 'none';
+  const planWrap = $('planPickWrap');
+  if (planWrap) planWrap.classList.toggle('hidden', !reg);
+  if (reg) syncPlanPickUi();
   const termsRow = $('termsAcceptRow');
   if (termsRow) termsRow.style.display = reg ? 'flex' : 'none';
   $('authToggleWrap').innerHTML = reg
@@ -124,6 +127,18 @@ function setAuthMode(mode) {
   $('authToggle').onclick = () => setAuthMode(reg ? 'login' : 'register');
   $('otpField').classList.add('hidden');
   $('authError').classList.add('hidden');
+}
+
+function syncPlanPickUi() {
+  document.querySelectorAll('#planPick [data-plan]').forEach((b) => {
+    b.classList.toggle('on', b.dataset.plan === state.selectedPlanId);
+  });
+  const cycle = $('regCycle');
+  if (cycle) {
+    cycle.querySelectorAll('button').forEach((b) => {
+      b.classList.toggle('on', b.dataset.cycle === (state.billingCycle || 'monthly'));
+    });
+  }
 }
 
 async function doAuth() {
@@ -139,11 +154,15 @@ async function doAuth() {
         return;
       }
       const name = $('authName').value.trim();
+      if (!state.selectedPlanId) {
+        toast('Escolha um plano para criar a conta.', true);
+        return;
+      }
       data = await Api.post('/auth/register', {
         email,
         password,
         name,
-        planId: state.selectedPlanId || 'pro',
+        planId: state.selectedPlanId,
         billingCycle: state.billingCycle || 'monthly',
         acceptedTerms: true,
         acceptedPrivacy: true,
@@ -1416,18 +1435,24 @@ async function loadPlansScreen() {
   ]);
   state.catalogPlans = plans;
   const s = sub.subscription;
+  const invoices = sub.invoices || [];
   const priceLabel =
     s.billingCycle === 'yearly'
       ? `${fmt(s.price)}/ano`
       : `${fmt(s.price)}/mês`;
+  const next = s.nextDueDate ? new Date(s.nextDueDate + 'T12:00:00').toLocaleDateString('pt-BR') : '—';
   $('currentPlanCard').innerHTML = `
     <div class="kv"><span>Plano</span><span>${s.planName}</span></div>
     <div class="kv"><span>Status</span><span>${s.status}</span></div>
-    <div class="kv"><span>Ciclo</span><span>${s.billingCycle === 'yearly' ? 'Anual' : 'Mensal'}</span></div>
+    <div class="kv"><span>Ciclo</span><span>${s.billingCycle === 'yearly' ? 'Anual · recorrente' : 'Mensal · recorrente'}</span></div>
     <div class="kv"><span>Valor</span><span>${priceLabel}</span></div>
-    <div class="kv" style="border:none"><span>1 mês grátis</span><span>Sem reembolso depois</span></div>
-    <p style="font-size:12px;color:var(--text-dim);margin:12px 0 0">1 mês grátis para testar. Não há reembolso após o período gratuito.${s.trialEndsAt ? ' Trial até ' + new Date(s.trialEndsAt).toLocaleDateString('pt-BR') + '.' : ''}</p>
-    ${sub.isOwner ? '<button class="btn-secondary" type="button" id="btnCancelPlan" style="margin-top:12px">Cancelar assinatura</button>' : ''}`;
+    <div class="kv"><span>Próxima cobrança</span><span>${next}</span></div>
+    <div class="kv" style="border:none"><span>1 mês grátis</span><span>Sem reembolso depois${s.trialEndsAt ? ' · até ' + new Date(s.trialEndsAt).toLocaleDateString('pt-BR') : ''}</span></div>
+    <div class="row-actions" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px">
+      ${s.payUrl ? `<a class="btn-primary" href="${s.payUrl}" target="_blank" rel="noopener" style="text-align:center;text-decoration:none">Pagar / cadastrar Pix ou cartão</a>` : ''}
+      ${sub.isOwner ? '<button class="btn-secondary" type="button" id="btnCancelPlan">Cancelar assinatura</button>' : ''}
+    </div>
+    <p style="font-size:12px;color:var(--text-dim);margin:12px 0 0">Cartão e Pix ficam no Asaas (página segura). Recorrência: cartão cobra sozinho; Pix gera uma fatura a cada ciclo.</p>`;
   const cancel = $('btnCancelPlan');
   if (cancel) {
     cancel.onclick = async () => {
@@ -1436,6 +1461,41 @@ async function loadPlansScreen() {
       alert(res.message);
       await loadPlansScreen();
     };
+  }
+
+  const alertBox = $('billingAlert');
+  if (alertBox) {
+    const bad = invoices.find((p) => p.failed) || invoices.find((p) => p.open);
+    if (bad) {
+      alertBox.classList.remove('hidden');
+      alertBox.innerHTML = `<h4>${bad.failed ? 'Pagamento em atraso ou falhou' : 'Há uma fatura em aberto'}</h4>
+        <p>${fmt(bad.value)} · vencimento ${bad.dueDate || '—'} · ${bad.statusLabel}</p>
+        ${bad.invoiceUrl ? `<a class="btn-confirm" href="${bad.invoiceUrl}" target="_blank" rel="noopener">Pagar agora ou trocar cartão</a>` : ''}`;
+    } else {
+      alertBox.classList.add('hidden');
+      alertBox.innerHTML = '';
+    }
+  }
+
+  const inv = $('invoiceList');
+  if (inv) {
+    if (!s.asaasEnabled) {
+      inv.innerHTML = '<p class="empty">Cobrança Asaas ainda não está ligada neste ambiente.</p>';
+    } else if (!invoices.length) {
+      inv.innerHTML = '<p class="empty">Nenhuma fatura ainda. Ao ativar um plano, a recorrência aparece aqui.</p>';
+    } else {
+      inv.innerHTML = invoices
+        .map(
+          (p) => `<div class="sale-row" style="cursor:default">
+            <span class="sale-dot ${p.failed ? 'cancelada' : p.open ? 'pendente' : 'quitado'}"></span>
+            <div class="sale-main"><div class="title">${p.statusLabel}</div>
+            <div class="sub">Vence ${p.dueDate || '—'}${p.paymentDate ? ' · pago ' + p.paymentDate : ''} · ${p.billingType || 'Pix/cartão'}</div></div>
+            <div class="sale-amt"><div class="v mono">${fmt(p.value)}</div>
+            ${p.invoiceUrl && (p.open || p.failed) ? `<a class="link" href="${p.invoiceUrl}" target="_blank" rel="noopener">Pagar</a>` : ''}</div>
+          </div>`
+        )
+        .join('');
+    }
   }
 
   const cycle = state.billingCycle;
@@ -1472,6 +1532,7 @@ async function loadPlansScreen() {
         state.user.billingCycle = res.subscription.billingCycle;
         state.user.planLimits = res.subscription.limits;
         applyUserChrome();
+        if (res.payUrl) window.open(res.payUrl, '_blank', 'noopener');
         alert(res.message);
         await loadPlansScreen();
       } catch (err) {
@@ -1490,6 +1551,21 @@ function wireEvents() {
   };
   $('btnAuth').onclick = doAuth;
   $('authToggle').onclick = () => setAuthMode(state.mode === 'login' ? 'register' : 'login');
+  document.querySelectorAll('#planPick [data-plan]').forEach((b) => {
+    b.onclick = () => {
+      state.selectedPlanId = b.dataset.plan;
+      syncPlanPickUi();
+    };
+  });
+  const regCycle = $('regCycle');
+  if (regCycle) {
+    regCycle.querySelectorAll('button').forEach((b) => {
+      b.onclick = () => {
+        state.billingCycle = b.dataset.cycle;
+        syncPlanPickUi();
+      };
+    });
+  }
   const planCycle = $('planCycleToggle');
   if (planCycle) {
     planCycle.querySelectorAll('button').forEach((b) => {

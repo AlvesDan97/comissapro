@@ -59,6 +59,10 @@ router.get(
     const extra = Number(owner.extra_seats) || 0;
     const base =
       (owner.billing_cycle || 'monthly') === 'yearly' ? plan.priceYearly : plan.priceMonthly;
+    const asaasSub = await asaas.getSubscription(owner.asaas_subscription_id);
+    const payments = (await asaas.listSubscriptionPayments(owner.asaas_subscription_id)).map(asaas.mapPayment).filter(Boolean);
+    const openPay = payments.find((p) => p.open);
+    const failedPay = payments.find((p) => p.failed);
     res.json({
       subscription: {
         planId: owner.plan || 'solo',
@@ -72,7 +76,13 @@ router.get(
         limits: { ...planLimits(owner.plan || 'solo'), extraSeats: extra, maxTeamMembers: seatCap(owner) },
         asaasEnabled: asaas.enabled(),
         asaasLinked: !!owner.asaas_subscription_id,
+        nextDueDate: asaasSub?.nextDueDate || owner.trial_ends_at?.slice(0, 10) || null,
+        billingType: asaasSub?.billingType || null,
+        asaasStatus: asaasSub?.status || null,
+        payUrl: openPay?.invoiceUrl || failedPay?.invoiceUrl || null,
+        openInvoice: openPay || failedPay || null,
       },
+      invoices: payments,
       plan,
       isOwner: req.user.isOwner,
     });
@@ -108,6 +118,7 @@ router.post(
     const before = { plan: user.plan, billingCycle: user.billing_cycle, status: user.plan_status };
     const now = new Date().toISOString();
     let asaasSub = user.asaas_subscription_id;
+    let payUrl = null;
     let message = `Plano ${plan.name} ativado.`;
 
     if (asaas.enabled()) {
@@ -125,11 +136,14 @@ router.post(
         plan,
         billingCycle,
         extraSeats: Number(user.extra_seats) || 0,
+        nextDueDate: stillTrial ? user.trial_ends_at : null,
       });
       asaasSub = created?.id || null;
+      const pays = (await asaas.listSubscriptionPayments(asaasSub)).map(asaas.mapPayment).filter(Boolean);
+      payUrl = pays.find((p) => p.invoiceUrl)?.invoiceUrl || created?.invoiceUrl || null;
       message = stillTrial
-        ? `Plano ${plan.name} reservado. A cobrança Asaas começa após o mês grátis.`
-        : `Plano ${plan.name} enviado ao Asaas.`;
+        ? `Plano ${plan.name} reservado. A 1ª cobrança fica para o fim do mês grátis. Abra a fatura para cadastrar Pix ou cartão.`
+        : `Plano ${plan.name} no Asaas. Pague a fatura para ativar a recorrência.`;
     }
 
     const status = asaas.enabled() ? user.plan_status || 'trialing' : 'active';
@@ -158,6 +172,7 @@ router.post(
         limits: planLimits(updated.plan),
       },
       message,
+      payUrl,
     });
   })
 );

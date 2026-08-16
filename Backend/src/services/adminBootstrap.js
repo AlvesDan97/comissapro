@@ -17,8 +17,8 @@ async function bootstrapAdmin() {
     }
     return;
   }
-  if (password.length < 10) {
-    console.warn('[admin] ADMIN_BOOTSTRAP_PASSWORD deve ter pelo menos 10 caracteres. Bootstrap ignorado.');
+  if (password.length < 8) {
+    console.warn('[admin] ADMIN_BOOTSTRAP_PASSWORD deve ter pelo menos 8 caracteres. Bootstrap ignorado.');
     return;
   }
 

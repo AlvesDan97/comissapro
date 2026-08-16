@@ -42,7 +42,11 @@ router.post(
       .toLowerCase();
     const password = String(req.body?.password || '');
     if (!email || !password) return res.status(400).json({ error: 'E-mail e senha obrigatórios' });
-    if (!emailAllowed(email)) return res.status(403).json({ error: 'E-mail não autorizado no portal.' });
+    if (!emailAllowed(email)) {
+      return res.status(403).json({
+        error: 'Este e-mail não está na lista do portal. Use o mesmo e-mail de ADMIN_EMAIL no Railway.',
+      });
+    }
 
     const admin = await db.get('SELECT * FROM admin_users WHERE email=?', [email]);
     if (!admin || !admin.active || !bcrypt.compareSync(password, admin.password_hash)) {
