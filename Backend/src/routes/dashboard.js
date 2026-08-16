@@ -15,7 +15,11 @@ router.get(
   asyncHandler(async (req, res) => {
     const month = new Date().toISOString().slice(0, 7);
     const ws = workspaceId(req);
-    await healUserMonth(ws, `${month}-01`);
+    try {
+      await healUserMonth(ws, `${month}-01`);
+    } catch (e) {
+      console.error('[dashboard] healUserMonth', e.message);
+    }
     const scope = req.query.scope === 'workspace' && req.user.canSeeTeam ? 'workspace' : 'me';
     const sellerId = scope === 'me' ? req.user.id : req.query.sellerId || null;
     const sellerSql = sellerId ? ' AND COALESCE(seller_id, user_id)=?' : '';
@@ -92,7 +96,7 @@ router.get(
        FROM commission_types ct
        LEFT JOIN sales s ON s.commission_type_id=ct.id AND s.user_id=ct.user_id
        WHERE ct.user_id=? AND ct.active=1
-       GROUP BY ct.id
+       GROUP BY ct.id, ct.name, ct.calc_type, ct.config_json, ct.receive_when, ct.sort_order, ct.created_at
        ORDER BY ct.sort_order ASC, ct.created_at ASC`,
       byCommissionParams
     );
@@ -128,34 +132,44 @@ router.get(
     let ranking = [];
     let alerts = [];
     if (scope === 'workspace' && req.user.canSeeTeam) {
-      ranking = await db.all(
-        `SELECT COALESCE(s.seller_id, s.user_id) as sellerId,
-                COALESCE(u.name, '—') as name,
-                COALESCE(SUM(s.commission_total),0) as commission,
-                COUNT(*) as launches
-         FROM sales s
-         LEFT JOIN users u ON u.id=COALESCE(s.seller_id, s.user_id)
-         WHERE s.user_id=? AND substr(s.sale_date,1,7)=? AND s.status!='cancelada'
-         GROUP BY sellerId ORDER BY commission DESC`,
-        [ws, month]
-      );
-      const team = await db.all(
-        `SELECT COALESCE(member_user_id, email) as sid, name, email, member_user_id
-         FROM team_members WHERE owner_user_id=? AND status='accepted'`,
-        [ws]
-      );
-      const launched = new Set(ranking.map((r) => r.sellerId));
-      launched.add(ws);
-      alerts = team
-        .filter((m) => m.member_user_id && !launched.has(m.member_user_id))
-        .map((m) => ({ type: 'no_launch', name: m.name || m.email, sellerId: m.member_user_id }));
+      try {
+        ranking = await db.all(
+          `SELECT COALESCE(s.seller_id, s.user_id) as "sellerId",
+                  MAX(COALESCE(u.name, '—')) as name,
+                  COALESCE(SUM(s.commission_total),0) as commission,
+                  COUNT(*) as launches
+           FROM sales s
+           LEFT JOIN users u ON u.id=COALESCE(s.seller_id, s.user_id)
+           WHERE s.user_id=? AND substr(s.sale_date,1,7)=? AND s.status!='cancelada'
+           GROUP BY COALESCE(s.seller_id, s.user_id)
+           ORDER BY commission DESC`,
+          [ws, month]
+        );
+        const team = await db.all(
+          `SELECT COALESCE(member_user_id, email) as sid, name, email, member_user_id
+           FROM team_members WHERE owner_user_id=? AND status='accepted'`,
+          [ws]
+        );
+        const launched = new Set(ranking.map((r) => r.sellerId || r.sellerid));
+        launched.add(ws);
+        alerts = team
+          .filter((m) => m.member_user_id && !launched.has(m.member_user_id))
+          .map((m) => ({ type: 'no_launch', name: m.name || m.email, sellerId: m.member_user_id }));
+      } catch (e) {
+        console.error('[dashboard] ranking', e.message);
+      }
     }
 
-    const mix = await computeMetric(ws, 'mix_by_type', {
-      from: `${month}-01`,
-      to: today,
-      sellerId,
-    });
+    let mix = { mix: [] };
+    try {
+      mix = await computeMetric(ws, 'mix_by_type', {
+        from: `${month}-01`,
+        to: today,
+        sellerId,
+      });
+    } catch (e) {
+      console.error('[dashboard] mix', e.message);
+    }
 
     const first = new Date();
     const monthStart = `${month}-01`;
@@ -218,13 +232,27 @@ router.get(
         commissionTotal: r.commission_total,
         grossValue: r.gross_value,
       })),
-      byCommission: byCommissionRows.map((r) => ({
-        ...mapRow(r),
-        monthCommission: r.month_commission,
-        monthCount: r.month_count,
-        monthRevenue: r.month_revenue,
-        todayCommission: r.today_commission,
-      })),
+      byCommission: byCommissionRows.map((r) => {
+        try {
+          return {
+            ...mapRow(r),
+            monthCommission: r.month_commission,
+            monthCount: r.month_count,
+            monthRevenue: r.month_revenue,
+            todayCommission: r.today_commission,
+          };
+        } catch (e) {
+          return {
+            id: r.id,
+            name: r.name,
+            calcType: r.calc_type,
+            monthCommission: r.month_commission,
+            monthCount: r.month_count,
+            monthRevenue: r.month_revenue,
+            todayCommission: r.today_commission,
+          };
+        }
+      }),
     });
   })
 );

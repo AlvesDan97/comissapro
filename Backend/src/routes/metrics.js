@@ -124,15 +124,16 @@ router.get(
     let sellers = [];
     if (req.user.canSeeTeam && !sellerId) {
       sellers = await db.all(
-        `SELECT COALESCE(s.seller_id, s.user_id) as sellerId,
-                COALESCE(u.name, '—') as name,
+        `SELECT COALESCE(s.seller_id, s.user_id) as "sellerId",
+                MAX(COALESCE(u.name, '—')) as name,
                 COALESCE(SUM(s.commission_total),0) as commission,
                 COUNT(*) as launches
          FROM sales s
          LEFT JOIN users u ON u.id=COALESCE(s.seller_id, s.user_id)
          WHERE s.user_id=? AND s.status!='cancelada' AND s.sale_date>=? AND s.sale_date<=?
          ${commissionTypeId ? 'AND s.commission_type_id=?' : ''}
-         GROUP BY sellerId ORDER BY commission DESC`,
+         GROUP BY COALESCE(s.seller_id, s.user_id)
+         ORDER BY commission DESC`,
         commissionTypeId ? [ws, from, to, commissionTypeId] : [ws, from, to]
       );
     }

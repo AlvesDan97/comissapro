@@ -131,7 +131,7 @@ async function computeMetric(workspaceId, key, filters = {}) {
          AND s.status!='cancelada' AND s.sale_date>=? AND s.sale_date<=?
          ${filters.sellerId ? 'AND COALESCE(s.seller_id, s.user_id)=?' : ''}
        WHERE ct.user_id=? AND ct.active=1
-       GROUP BY ct.id ORDER BY commission DESC`,
+       GROUP BY ct.id, ct.name ORDER BY commission DESC`,
       filters.sellerId ? [from, to, filters.sellerId, workspaceId] : [from, to, workspaceId]
     );
     const total = rows.reduce((s, r) => s + Number(r.commission), 0) || 1;
@@ -170,7 +170,7 @@ async function compareSeries(workspaceId, { from, to, groupBy = 'month', sellerI
     sql += ' AND commission_type_id=?';
     params.push(commissionTypeId);
   }
-  sql += ` GROUP BY bucket ORDER BY bucket`;
+  sql += ` GROUP BY ${expr} ORDER BY ${expr}`;
   const rows = await db.all(sql, params);
 
   const valueOf = (r) => {
