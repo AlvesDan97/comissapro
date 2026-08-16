@@ -142,8 +142,14 @@ button{font-family:inherit;cursor:pointer}
 }
 
 @media(max-width:720px){
+  .nav{flex-wrap:wrap;gap:10px}
+  .nav-links{width:100%;justify-content:flex-end;flex-wrap:wrap}
   .nav-links a:not(.btn){display:none}
+  .nav-links .btn{flex:1;min-width:120px}
   .hero{padding-top:12px;padding-bottom:28px}
+  .hero-cta{flex-direction:column;align-items:stretch}
+  .hero-cta .btn{width:100%}
   .section{padding:32px 16px}
   .final{padding:36px 16px 28px}
+  .footer{flex-direction:column;align-items:flex-start}
 }

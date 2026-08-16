@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#08090A">
 <title>Comiss — Central universal de vendas e comissões</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -48,8 +48,8 @@
       </div>
       <p class="login-alt" style="margin:0 0 12px;font-size:11px">1 mês grátis em qualquer plano. Sem reembolso depois. Você pode trocar depois em Planos.</p>
     </div>
-    <div class="field"><label>E-mail</label><input id="authEmail" type="email" value="marina.souza@exemplo.com"></div>
-    <div class="field"><label>Senha</label><input id="authPassword" type="password" value="demo1234"></div>
+    <div class="field"><label>E-mail</label><input id="authEmail" type="email" autocomplete="username" placeholder="seu@email.com"></div>
+    <div class="field"><label>Senha</label><input id="authPassword" type="password" autocomplete="current-password" placeholder="Sua senha"></div>
     <div class="field hidden" id="otpField"><label>Código 2FA (OTP)</label><input id="authOtp" type="text" placeholder="123456"></div>
     <div class="biometry-row"><span>Entrar com biometria</span><button class="switch on" id="bioSwitch" type="button" aria-label="Biometria"></button></div>
     <label id="termsAcceptRow" class="biometry-row" style="margin:0 0 14px;align-items:flex-start;gap:10px;display:none">
@@ -71,12 +71,12 @@
       <p class="login-sub" id="confirmHint">Enviamos um link para o seu e-mail. Abra para liberar o acesso (vale 48 horas). Confira também o spam.</p>
       <button class="btn-secondary" type="button" id="btnResendConfirm">Reenviar e-mail</button>
     </div>
+    <div id="inviteBox" class="hidden" style="margin-top:10px">
       <p class="login-sub" id="inviteHint">Você foi convidado para um espaço.</p>
       <div class="field"><label>Seu nome</label><input id="inviteJoinName" type="text"></div>
       <div class="field"><label>Crie uma senha</label><input id="inviteJoinPassword" type="password"></div>
       <button class="btn-primary" type="button" id="btnAcceptInvite">Entrar no espaço</button>
     </div>
-    <p class="login-alt" style="margin-top:8px;font-size:11px">Demo: marina.souza@exemplo.com / demo1234</p>
     <p class="login-alt" style="margin-top:10px;font-size:11px">
       <a href="/termos.html" target="_blank" style="color:var(--text-dim)">Termos</a> ·
       <a href="/privacidade.html" target="_blank" style="color:var(--text-dim)">Privacidade</a> ·
