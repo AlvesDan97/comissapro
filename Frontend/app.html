@@ -67,7 +67,10 @@
       <div class="field"><label>Nova senha</label><input id="resetPassword" type="password"></div>
       <button class="btn-primary" type="button" id="btnReset">Salvar nova senha</button>
     </div>
-    <div id="inviteBox" class="hidden" style="margin-top:10px">
+    <div id="confirmBox" class="hidden" style="margin-top:10px">
+      <p class="login-sub" id="confirmHint">Enviamos um link para o seu e-mail. Abra para liberar o acesso (vale 48 horas). Confira também o spam.</p>
+      <button class="btn-secondary" type="button" id="btnResendConfirm">Reenviar e-mail</button>
+    </div>
       <p class="login-sub" id="inviteHint">Você foi convidado para um espaço.</p>
       <div class="field"><label>Seu nome</label><input id="inviteJoinName" type="text"></div>
       <div class="field"><label>Crie uma senha</label><input id="inviteJoinPassword" type="password"></div>

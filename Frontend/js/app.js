@@ -127,6 +127,7 @@ function setAuthMode(mode) {
   $('authToggle').onclick = () => setAuthMode(reg ? 'login' : 'register');
   $('otpField').classList.add('hidden');
   $('authError').classList.add('hidden');
+  if ($('confirmBox') && !urlParams.get('confirm')) $('confirmBox').classList.add('hidden');
 }
 
 function syncPlanPickUi() {
@@ -167,6 +168,12 @@ async function doAuth() {
         acceptedTerms: true,
         acceptedPrivacy: true,
       });
+      if (data.needsConfirm) {
+        $('confirmHint').textContent = data.message || `Enviamos um link para ${data.email}. Abra o e-mail para entrar.`;
+        $('confirmBox').classList.remove('hidden');
+        toast(data.message || 'Confirme seu e-mail para entrar.');
+        return;
+      }
     } else {
       data = await Api.post('/auth/login', { email, password, otp: otp || undefined });
     }
@@ -178,6 +185,12 @@ async function doAuth() {
     if (!data.user.onboardingDone) startOnboarding();
     else await enterApp();
   } catch (err) {
+    if (err.data?.needsConfirm) {
+      $('confirmBox').classList.remove('hidden');
+      $('confirmHint').textContent = err.message;
+      toast(err.message, true);
+      return;
+    }
     if (err.data?.requireOtp) {
       $('otpField').classList.remove('hidden');
       toast(err.data.hint || 'Informe o OTP', true);
@@ -1752,6 +1765,12 @@ function wireEvents() {
       await enterApp();
     };
   }
+  if ($('btnResendConfirm')) {
+    $('btnResendConfirm').onclick = async () => {
+      const res = await Api.post('/auth/resend-confirm', { email: $('authEmail').value });
+      toast(res.message || 'Enviado');
+    };
+  }
   if ($('btnAcceptInvite')) {
     $('btnAcceptInvite').onclick = async () => {
       if (!$('termsAccept')?.checked) {
@@ -1852,6 +1871,24 @@ function wireEvents() {
 
 async function boot() {
   wireEvents();
+
+  if (urlParams.get('confirm')) {
+    $('splash').classList.add('hide');
+    show($('login'));
+    try {
+      const data = await Api.post('/auth/confirm', { token: urlParams.get('confirm') });
+      Api.setToken(data.token);
+      state.user = data.user;
+      state.nicheFields = data.nicheFields || {};
+      hide($('login'));
+      if (!data.user.onboardingDone) startOnboarding();
+      else await enterApp();
+    } catch (e) {
+      $('confirmBox').classList.remove('hidden');
+      toast(e.message || 'Link inválido. Peça um novo e-mail.', true);
+    }
+    return;
+  }
 
   if (Api.token) {
     try {

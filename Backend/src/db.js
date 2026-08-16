@@ -299,6 +299,10 @@ async function migrate() {
   await ensureColumn('users', 'notify_prefs_json', "notify_prefs_json TEXT DEFAULT '{}'");
   await ensureColumn('users', 'blocked_at', 'blocked_at TEXT');
   await ensureColumn('users', 'blocked_reason', 'blocked_reason TEXT');
+  await ensureColumn('users', 'email_verified_at', 'email_verified_at TEXT');
+  await ensureColumn('users', 'email_confirm_token', 'email_confirm_token TEXT');
+  await ensureColumn('users', 'email_confirm_expires', 'email_confirm_expires TEXT');
+  await exec(`UPDATE users SET email_verified_at = created_at WHERE email_verified_at IS NULL OR email_verified_at = ''`);
   await exec(`
     CREATE TABLE IF NOT EXISTS admin_users (
       id TEXT PRIMARY KEY,

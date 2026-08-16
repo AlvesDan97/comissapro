@@ -46,9 +46,73 @@ router.post(
     );
 
     const user = await db.get('SELECT * FROM users WHERE id = ?', [id]);
-    const session = await buildSession(user);
-    await audit(id, 'CREATE', 'user', id, null, session);
-    res.status(201).json({ token: signToken(user), user: session, nicheFields: NICHE_FIELDS });
+    const confirm = token();
+    const expires = addDays(now, 2);
+    await db.run(`UPDATE users SET email_confirm_token=?, email_confirm_expires=?, updated_at=? WHERE id=?`, [
+      confirm,
+      expires,
+      now,
+      id,
+    ]);
+    const link = `${appBaseUrl()}/app?confirm=${confirm}`;
+    await sendTemplate('confirm', { to: user.email, vars: { name: user.name, link } });
+    await audit(id, 'CREATE', 'user', id, null, { email: user.email, plan: plan.id, needsConfirm: true });
+    res.status(201).json({
+      ok: true,
+      needsConfirm: true,
+      email: user.email,
+      message: 'Enviamos um link de confirmação para o seu e-mail. Abra a caixa de entrada (e o spam) para liberar o acesso.',
+    });
+  })
+);
+
+router.post(
+  '/confirm',
+  asyncHandler(async (req, res) => {
+    const confirmToken = String(req.body?.token || '').trim();
+    if (!confirmToken) return res.status(400).json({ error: 'Token obrigatório' });
+    const user = await db.get(
+      'SELECT * FROM users WHERE email_confirm_token=? AND email_confirm_expires >= ?',
+      [confirmToken, new Date().toISOString()]
+    );
+    if (!user) return res.status(400).json({ error: 'Link inválido ou expirado. Peça um novo e-mail.' });
+    const now = new Date().toISOString();
+    await db.run(
+      `UPDATE users SET email_verified_at=?, email_confirm_token=NULL, email_confirm_expires=NULL, updated_at=? WHERE id=?`,
+      [now, now, user.id]
+    );
+    const fresh = await db.get('SELECT * FROM users WHERE id=?', [user.id]);
+    const session = await buildSession(fresh);
+    await audit(user.id, 'CONFIRM', 'user', user.id, null, { email: user.email });
+    res.json({ token: signToken(fresh), user: session, nicheFields: NICHE_FIELDS });
+  })
+);
+
+router.post(
+  '/resend-confirm',
+  asyncHandler(async (req, res) => {
+    const email = String(req.body?.email || '')
+      .trim()
+      .toLowerCase();
+    const user = email ? await db.get('SELECT * FROM users WHERE email=?', [email]) : null;
+    if (user && !user.email_verified_at) {
+      const confirm = token();
+      const now = new Date().toISOString();
+      await db.run(`UPDATE users SET email_confirm_token=?, email_confirm_expires=?, updated_at=? WHERE id=?`, [
+        confirm,
+        addDays(now, 2),
+        now,
+        user.id,
+      ]);
+      await sendTemplate('confirm', {
+        to: user.email,
+        vars: { name: user.name, link: `${appBaseUrl()}/app?confirm=${confirm}` },
+      });
+    }
+    res.json({
+      ok: true,
+      message: 'Se a conta existir e ainda não estiver confirmada, enviamos o e-mail.',
+    });
   })
 );
 
@@ -62,6 +126,13 @@ router.post(
     }
     if (user.blocked_at) {
       return res.status(403).json({ error: 'Esta conta foi bloqueada. Fale com o suporte Comiss.' });
+    }
+    if (!user.email_verified_at) {
+      return res.status(403).json({
+        error: 'Confirme seu e-mail para entrar. Enviamos o link na criação da conta.',
+        needsConfirm: true,
+        email: user.email,
+      });
     }
     if (user.twofa_enabled) {
       const ok = otp === '123456' || otp === user.twofa_secret;
@@ -180,8 +251,8 @@ router.post(
     );
     if (!user) return res.status(400).json({ error: 'Link inválido ou expirado' });
     await db.run(
-      `UPDATE users SET password_hash=?, reset_token=NULL, reset_token_expires=NULL, updated_at=? WHERE id=?`,
-      [bcrypt.hashSync(password, 12), new Date().toISOString(), user.id]
+      `UPDATE users SET password_hash=?, reset_token=NULL, reset_token_expires=NULL, email_verified_at=COALESCE(email_verified_at, ?), updated_at=? WHERE id=?`,
+      [bcrypt.hashSync(password, 12), new Date().toISOString(), new Date().toISOString(), user.id]
     );
     const session = await buildSession(user);
     res.json({ ok: true, token: signToken(user), user: session, nicheFields: NICHE_FIELDS });
@@ -238,8 +309,8 @@ router.post(
     const id = uuid();
     const owner = await db.get('SELECT * FROM users WHERE id=?', [invite.owner_user_id]);
     await db.run(
-      `INSERT INTO users (id, email, password_hash, name, plan, billing_cycle, plan_status, plan_started_at, trial_ends_at, workspace_id, workspace_role, onboarding_done, accepted_terms_at, accepted_privacy_at, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`,
+      `INSERT INTO users (id, email, password_hash, name, plan, billing_cycle, plan_status, plan_started_at, trial_ends_at, workspace_id, workspace_role, onboarding_done, accepted_terms_at, accepted_privacy_at, email_verified_at, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)`,
       [
         id,
         invite.email,
@@ -252,6 +323,7 @@ router.post(
         owner?.trial_ends_at || now,
         invite.owner_user_id,
         invite.role || 'viewer',
+        now,
         now,
         now,
         now,

@@ -107,6 +107,9 @@ function authRequired(req, res, next) {
     .then((row) => {
       if (!row) return res.status(401).json({ error: 'Usuário não encontrado' });
       if (row.blocked_at) return res.status(403).json({ error: 'Esta conta foi bloqueada.' });
+      if (!row.email_verified_at) {
+        return res.status(403).json({ error: 'Confirme seu e-mail para continuar.', needsConfirm: true });
+      }
       return buildSession(row).then((session) => {
         req.user = session;
         next();

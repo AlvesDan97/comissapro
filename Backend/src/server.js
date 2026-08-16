@@ -86,6 +86,8 @@ app.use('/api/auth/register', loginLimiter);
 app.use('/api/auth/forgot', loginLimiter);
 app.use('/api/auth/reset', loginLimiter);
 app.use('/api/auth/accept-invite', loginLimiter);
+app.use('/api/auth/confirm', loginLimiter);
+app.use('/api/auth/resend-confirm', loginLimiter);
 app.use('/api/admin/login', loginLimiter);
 app.use('/api', apiLimiter);
 

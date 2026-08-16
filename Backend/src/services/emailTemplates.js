@@ -46,6 +46,17 @@ const TEMPLATES = {
       ctaUrl: v.link,
     }),
   }),
+  confirm: (v) => ({
+    subject: 'Confirme seu e-mail — Comiss',
+    text: `Olá${v.name ? `, ${v.name}` : ''}. Confirme sua conta no Comiss: ${v.link} (vale 48 horas).`,
+    html: wrap({
+      title: 'Confirme seu e-mail',
+      preheader: 'Um clique para liberar sua conta',
+      body: `<p style="margin:0 0 12px">Olá${v.name ? `, <strong>${esc(v.name)}</strong>` : ''}. Falta um passo para entrar no Comiss.</p><p style="margin:0">Confirme que este e-mail é seu. O link vale 48 horas.</p>`,
+      ctaLabel: 'Confirmar e entrar',
+      ctaUrl: v.link,
+    }),
+  }),
   reset: (v) => ({
     subject: 'Redefinir senha — Comiss',
     text: `Para criar uma nova senha, abra: ${v.link} (24 horas).`,
