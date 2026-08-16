@@ -18,6 +18,23 @@ function token() {
   return crypto.randomBytes(24).toString('hex');
 }
 
+function isEmailVerified(user) {
+  return Boolean(user?.email_verified_at);
+}
+
+async function sendConfirmEmail(user, req) {
+  const confirm = token();
+  const now = new Date().toISOString();
+  await db.run(`UPDATE users SET email_confirm_token=?, email_confirm_expires=?, email_verified_at=NULL, updated_at=? WHERE id=?`, [
+    confirm,
+    addDays(now, 2),
+    now,
+    user.id,
+  ]);
+  const link = `${appBaseUrl(req)}/app?confirm=${confirm}`;
+  await sendTemplate('confirm', { to: user.email, vars: { name: user.name, link } });
+}
+
 router.post(
   '/register',
   asyncHandler(async (req, res) => {
@@ -46,16 +63,7 @@ router.post(
     );
 
     const user = await db.get('SELECT * FROM users WHERE id = ?', [id]);
-    const confirm = token();
-    const expires = addDays(now, 2);
-    await db.run(`UPDATE users SET email_confirm_token=?, email_confirm_expires=?, updated_at=? WHERE id=?`, [
-      confirm,
-      expires,
-      now,
-      id,
-    ]);
-    const link = `${appBaseUrl(req)}/app?confirm=${confirm}`;
-    await sendTemplate('confirm', { to: user.email, vars: { name: user.name, link } });
+    await sendConfirmEmail(user, req);
     await audit(id, 'CREATE', 'user', id, null, { email: user.email, plan: plan.id, needsConfirm: true });
     res.status(201).json({
       ok: true,
@@ -95,19 +103,8 @@ router.post(
       .trim()
       .toLowerCase();
     const user = email ? await db.get('SELECT * FROM users WHERE email=?', [email]) : null;
-    if (user && !user.email_verified_at) {
-      const confirm = token();
-      const now = new Date().toISOString();
-      await db.run(`UPDATE users SET email_confirm_token=?, email_confirm_expires=?, updated_at=? WHERE id=?`, [
-        confirm,
-        addDays(now, 2),
-        now,
-        user.id,
-      ]);
-      await sendTemplate('confirm', {
-        to: user.email,
-        vars: { name: user.name, link: `${appBaseUrl(req)}/app?confirm=${confirm}` },
-      });
+    if (user && !isEmailVerified(user)) {
+      await sendConfirmEmail(user, req);
     }
     res.json({
       ok: true,
@@ -127,9 +124,10 @@ router.post(
     if (user.blocked_at) {
       return res.status(403).json({ error: 'Esta conta foi bloqueada. Fale com o suporte Comiss.' });
     }
-    if (!user.email_verified_at) {
+    if (!isEmailVerified(user)) {
+      await sendConfirmEmail(user, req);
       return res.status(403).json({
-        error: 'Confirme seu e-mail para entrar. Enviamos o link na criação da conta.',
+        error: 'Confirme seu e-mail para entrar. Enviamos um novo link agora.',
         needsConfirm: true,
         email: user.email,
       });

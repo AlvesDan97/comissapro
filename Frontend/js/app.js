@@ -2192,8 +2192,15 @@ async function boot() {
       if (!me.user.onboardingDone) startOnboarding();
       else await enterApp();
       return;
-    } catch {
+    } catch (e) {
       Api.setToken(null);
+      if (e.data?.needsConfirm) {
+        $('splash').classList.add('hide');
+        show($('login'));
+        $('confirmBox').classList.remove('hidden');
+        $('confirmHint').textContent =
+          e.message || 'Confirme seu e-mail para entrar. Abra o link que enviamos (e o spam).';
+      }
     }
   }
 
